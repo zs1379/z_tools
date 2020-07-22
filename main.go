@@ -22,6 +22,7 @@ import (
 var (
 	conf       *Config                                   // 配置
 	workDir    string                                    // 工作目录
+	UserToken  string                                    // 用户token
 	fileSep    = "/"                                     // 目录分隔符
 	ignoreList = []string{"doc", "doc.exe", "conf.json"} // 忽略的文件列表
 )
@@ -29,7 +30,6 @@ var (
 // Config 配置
 type Config struct {
 	ServerHost string `json:"server"`
-	UserToken  string `json:"token"`
 }
 
 // DocDesc 文章描述
@@ -49,6 +49,7 @@ type respData struct {
 var help = `用法:
 	./doc 命令 参数
 支持的命令有:
+	init        初始化token
 	new         新建文章
 	add         工作区文章新增/变更提交到本地仓库 
 	pull        服务器拉取最新文章列表
@@ -71,9 +72,7 @@ func ParseConfig() (*Config, error) {
 	if conf.ServerHost == "" {
 		return nil, errors.New("未配置server")
 	}
-	if conf.UserToken == "" {
-		return nil, errors.New("未配置token")
-	}
+
 	return &conf, nil
 }
 
@@ -111,7 +110,21 @@ func main() {
 	}
 
 	method := strings.ToLower(os.Args[1])
+
+	UserToken = ReadToken()
+	if UserToken == "" && method != "init" {
+		log.Printf("token为空,请先初始化token")
+		return
+	}
+
 	switch method {
+	case "init":
+		if len(os.Args) < 3 {
+			log.Printf("请输入token")
+			return
+		}
+		token := os.Args[2]
+		InitToken(token)
 	case "pull":
 		Pull()
 	case "new":
@@ -193,6 +206,20 @@ func WriteIndex(m map[string]*DocDesc) error {
 	return nil
 }
 
+func InitToken(token string) {
+	err := ioutil.WriteFile(fmt.Sprintf("%s%srepo%stoken", workDir, fileSep, fileSep), []byte(token), 0644)
+	if err != nil {
+		log.Printf("初始化token异常:%s", err.Error())
+		return
+	}
+	log.Printf("初始化token成功")
+}
+
+func ReadToken() string {
+	b, _ := ioutil.ReadFile(fmt.Sprintf("%s%srepo%stoken", workDir, fileSep, fileSep))
+	return string(b)
+}
+
 // Pull 拉取远程
 func Pull() {
 	localPosts, err := ReadIndex()
@@ -201,7 +228,7 @@ func Pull() {
 		return
 	}
 
-	body, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", conf.ServerHost, conf.UserToken))
+	body, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", conf.ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程列表异常:%s", err.Error())
 		return
@@ -230,7 +257,7 @@ func Pull() {
 			}
 		}
 
-		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=get&filename=%s", conf.ServerHost, conf.UserToken, remote.FileName)
+		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=get&filename=%s", conf.ServerHost, UserToken, remote.FileName)
 		body, err := pkg.HttpGet(url)
 		if err != nil {
 			log.Printf("拉取文章异常:%s,文章:%s", err.Error(), remote.FileName)
@@ -283,7 +310,7 @@ func Push() {
 		return
 	}
 
-	ret, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", conf.ServerHost, conf.UserToken))
+	ret, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", conf.ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
@@ -324,12 +351,12 @@ func Push() {
 		content := string(b)
 		form := url.Values{
 			"file_name": {v.FileName},
-			"token":     {conf.UserToken},
+			"token":     {UserToken},
 			"md5":       {v.Md5},
 			"content":   {content},
 			"title":     {v.Title},
 		}
-		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=add&filename=%s", conf.ServerHost, conf.UserToken, v.FileName)
+		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=add&filename=%s", conf.ServerHost, UserToken, v.FileName)
 		resp, err := pkg.HttpPost(url, form)
 		if err != nil {
 			log.Printf("上传文章异常:%s,文章:%s", err.Error(), v.FileName)
@@ -610,7 +637,7 @@ func replaceImg(fileName string) error {
 		return nil
 	}
 
-	body, err := pkg.HttpGet(conf.ServerHost + "/basic/getPicToken?token=" + conf.UserToken)
+	body, err := pkg.HttpGet(conf.ServerHost + "/basic/getPicToken?token=" + UserToken)
 	if err != nil {
 		return errors.New("拉取图片上传token异常:" + err.Error())
 	}
@@ -619,7 +646,7 @@ func replaceImg(fileName string) error {
 	json.Unmarshal(body, &ret)
 	i, ok := ret.Data.(map[string]interface{})
 	if !ok {
-		return errors.New("拉取图片上传token异常:" + err.Error())
+		return errors.New(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%v", ret.Data))
 	}
 	imgToken := i["token"].(string)
 	if imgToken == "" {
