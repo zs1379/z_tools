@@ -20,17 +20,12 @@ import (
 )
 
 var (
-	conf       *Config                                   // 配置
 	workDir    string                                    // 工作目录
+	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string                                    // 用户token
 	fileSep    = "/"                                     // 目录分隔符
 	ignoreList = []string{"doc", "doc.exe", "conf.json"} // 忽略的文件列表
 )
-
-// Config 配置
-type Config struct {
-	ServerHost string `json:"server"`
-}
 
 // DocDesc 文章描述
 type DocDesc struct {
@@ -58,36 +53,11 @@ var help = `用法:
 	checkout    恢复本地仓库的指定文件到工作区 参数:文件名
 `
 
-// ParseConfig 解析配置
-func ParseConfig() (*Config, error) {
-	b, err := ioutil.ReadFile("conf.json")
-	if err != nil {
-		return nil, err
-	}
-	var conf Config
-	err = json.Unmarshal(b, &conf)
-	if err != nil {
-		return nil, err
-	}
-	if conf.ServerHost == "" {
-		return nil, errors.New("未配置server")
-	}
-
-	return &conf, nil
-}
-
 func main() {
 	if len(os.Args) == 1 {
 		log.Printf(help)
 		return
 	}
-
-	cfg, err := ParseConfig()
-	if err != nil {
-		log.Printf("读取配置异常:%s", err.Error())
-		return
-	}
-	conf = cfg
 
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
@@ -228,7 +198,7 @@ func Pull() {
 		return
 	}
 
-	body, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", conf.ServerHost, UserToken))
+	body, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程列表异常:%s", err.Error())
 		return
@@ -257,7 +227,7 @@ func Pull() {
 			}
 		}
 
-		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=get&filename=%s", conf.ServerHost, UserToken, remote.FileName)
+		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=get&filename=%s", ServerHost, UserToken, remote.FileName)
 		body, err := pkg.HttpGet(url)
 		if err != nil {
 			log.Printf("拉取文章异常:%s,文章:%s", err.Error(), remote.FileName)
@@ -310,7 +280,7 @@ func Push() {
 		return
 	}
 
-	ret, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", conf.ServerHost, UserToken))
+	ret, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
@@ -356,7 +326,7 @@ func Push() {
 			"content":   {content},
 			"title":     {v.Title},
 		}
-		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=add&filename=%s", conf.ServerHost, UserToken, v.FileName)
+		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=add&filename=%s", ServerHost, UserToken, v.FileName)
 		resp, err := pkg.HttpPost(url, form)
 		if err != nil {
 			log.Printf("上传文章异常:%s,文章:%s", err.Error(), v.FileName)
@@ -637,7 +607,7 @@ func replaceImg(fileName string) error {
 		return nil
 	}
 
-	body, err := pkg.HttpGet(conf.ServerHost + "/basic/getPicToken?token=" + UserToken)
+	body, err := pkg.HttpGet(ServerHost + "/basic/getPicToken?token=" + UserToken)
 	if err != nil {
 		return errors.New("拉取图片上传token异常:" + err.Error())
 	}
@@ -646,7 +616,7 @@ func replaceImg(fileName string) error {
 	json.Unmarshal(body, &ret)
 	i, ok := ret.Data.(map[string]interface{})
 	if !ok {
-		return errors.New(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%v", ret.Data))
+		return errors.New(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%s", string(body)))
 	}
 	imgToken := i["token"].(string)
 	if imgToken == "" {
