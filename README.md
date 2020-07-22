@@ -1,6 +1,12 @@
 # z_tools
 用于协助快速上传文章至z项目
 
+#### 项目目录结构（勿删）
+1. doc  mac版程序
+2. doc.exe Windows程序
+3. conf.json 配置文件
+4. /repo 本地仓库
+
 #### 1.创建一个hello.md的文章
 
 ```
