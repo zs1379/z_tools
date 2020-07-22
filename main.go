@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	workDir    string                                    // 工作目录
+	workDir    string // 工作目录
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string                                    // 用户token
 	fileSep    = "/"                                     // 目录分隔符
@@ -76,6 +76,11 @@ func main() {
 	err = os.MkdirAll(workDir+"/repo", os.ModePerm)
 	if err != nil {
 		log.Printf("创建repo目录异常:%s", err.Error())
+		return
+	}
+	err = os.MkdirAll(workDir+"/img", os.ModePerm)
+	if err != nil {
+		log.Printf("创建img目录异常:%s", err.Error())
 		return
 	}
 
@@ -639,7 +644,7 @@ func replaceImg(fileName string) error {
 		qNKey := pkg.GetKey() + ext
 		var localPath string
 		if strings.Contains(imgURL, "http") || strings.Contains(imgURL, "https") {
-			localPath = fmt.Sprintf("img/%s", qNKey)
+			localPath = getImgPath(qNKey)
 			err := pkg.DownLoadFile(imgURL, localPath)
 			if err != nil {
 				log.Printf("下载图片异常:%s,imgURL:%s", err.Error(), imgURL)
@@ -722,4 +727,9 @@ func getRepoFilePath(fileName string) string {
 // getWorkFilePath  workDir+"/"+remote.FileName
 func getWorkFilePath(fileName string) string {
 	return fmt.Sprintf("%s%s%s", workDir, fileSep, fileName)
+}
+
+// getImgPath  workDir+"/"+remote.FileName
+func getImgPath(fileName string) string {
+	return fmt.Sprintf("%s%simg%s%s", workDir, fileSep, fileSep, fileName)
 }

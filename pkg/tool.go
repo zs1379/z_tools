@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -66,7 +65,7 @@ func HttpPost(url string, form url.Values) ([]byte, error) {
 	defer rsp.Body.Close()
 	body, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
-
+		return nil, err
 	}
 	return body, nil
 }
@@ -78,13 +77,13 @@ func Write2File(data []byte, pathToFile string) error {
 	if err != nil {
 		return fmt.Errorf("创建文件%s失败 %s", tmpFile, err)
 	}
-	defer file.Close()
 
 	_, err = file.Write(data)
 	if err != nil {
 		return fmt.Errorf("写入内容失败 %s", err)
 	}
 
+	file.Close()
 	err = os.Rename(tmpFile, pathToFile)
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
 		return fmt.Errorf("临时文件替换失败 %s %s", pathToFile, err)
@@ -162,15 +161,16 @@ func DownLoadFile(URL string, fileName string) error {
 		return err
 	}
 
-	err = os.MkdirAll(path.Dir(fileName), os.ModePerm)
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.Create(fileName)
+	err = ioutil.WriteFile(fileName, body, 0644)
 	if err != nil {
 		return err
 	}
-	io.Copy(f, res.Body)
+
 	return nil
 }
