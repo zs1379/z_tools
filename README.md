@@ -4,7 +4,7 @@
 #### 项目目录结构（勿删）
 1. doc  mac版程序
 2. doc.exe Windows程序
-3. conf.json 配置文件
+3. /img 图片暂存文件夹
 4. /repo 本地仓库
 
 #### 1.初始化 
