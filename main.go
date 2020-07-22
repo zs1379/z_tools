@@ -73,14 +73,9 @@ func main() {
 		fileSep = "/"
 	}
 
-	err = os.MkdirAll(workDir+"/repo", os.ModePerm)
+	err = os.MkdirAll(workDir+"/repo/img", os.ModePerm)
 	if err != nil {
 		log.Printf("创建repo目录异常:%s", err.Error())
-		return
-	}
-	err = os.MkdirAll(workDir+"/img", os.ModePerm)
-	if err != nil {
-		log.Printf("创建img目录异常:%s", err.Error())
 		return
 	}
 
@@ -364,11 +359,9 @@ func NewDoc(fileName string) {
 	}
 	docFormat := `---
 title: %s
-date: %s
-tags:
 ---`
 
-	docContent := fmt.Sprintf(docFormat, fileName, time.Now().Format("2006-01-02 15:04:05"))
+	docContent := fmt.Sprintf(docFormat, fileName[0:len(fileName)-3])
 	err = ioutil.WriteFile(getWorkFilePath(fileName), []byte(docContent), 0644)
 	if err != nil {
 		log.Printf("本地创建文章异常:%s,文章:%s", err.Error(), fileName)
@@ -659,6 +652,7 @@ func replaceImg(fileName string) error {
 			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
 			continue
 		}
+
 		newImg := fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", ret.Key)
 		content = strings.Replace(content, imgURL, newImg, -1)
 		log.Printf("图片替换成功,原始图片:%s,新图片:%s", imgURL, newImg)
@@ -731,5 +725,5 @@ func getWorkFilePath(fileName string) string {
 
 // getImgPath  workDir+"/"+remote.FileName
 func getImgPath(fileName string) string {
-	return fmt.Sprintf("%s%simg%s%s", workDir, fileSep, fileSep, fileName)
+	return fmt.Sprintf("%s%srepo%simg%s%s", workDir, fileSep,fileSep, fileSep, fileName)
 }
