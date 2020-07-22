@@ -635,6 +635,9 @@ func replaceImg(fileName string) error {
 		if !isSupportImg(ext) {
 			continue
 		}
+		if strings.Contains(imgURL, "jiaoliuqu.com") {
+			continue
+		}
 
 		qNKey := pkg.GetKey() + ext
 		var localPath string
