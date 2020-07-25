@@ -25,18 +25,16 @@ hello.md将自动生成到了工作目录下,打开hello.md看下：
 
 ```
 ---
-title: hello.md
+title: hello
 ---
 ```
-内容是Markdown格式的，可以根据需要修改title和date
+内容是Markdown格式的，前三行自动生成格式不要修改,可以根据需要修改title内容
 
 例如编辑完:
 
 ```
 ---
 title: helloWorld
-date: 2020-07-22 00:08:39
-tags:
 ---
 
 hello world
