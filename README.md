@@ -2,11 +2,12 @@
 用于协助快速上传文章至z项目
 
 
-#### 1.下载doc.zip文件，解压进入doc文件夹 
+#### 1.下载doc.zip文件，解压进入文件夹 
 ##### 目录结构
 1. doc  mac版程序
 2. doc.exe Windows程序
 3. /repo 本地仓库
+4. ignore 忽略的文件列表 (类似git的.ignore文件)
 
 #### 2.初始化 
 
