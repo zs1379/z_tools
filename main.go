@@ -22,9 +22,8 @@ import (
 var (
 	workDir    string // 工作目录
 	ServerHost = "http://z.jiaoliuqu.com"
-	UserToken  string                                    // 用户token
-	fileSep    = "/"                                     // 目录分隔符
-	ignoreList = []string{"doc", "doc.exe", "conf.json"} // 忽略的文件列表
+	UserToken  string // 用户token
+	fileSep    = "/"  // 目录分隔符
 )
 
 // DocDesc 文章描述
@@ -37,8 +36,9 @@ type DocDesc struct {
 
 // respData 返回给客户端的数据
 type respData struct {
-	Msg  string      `json:"msg"`
-	Data interface{} `json:"data"`
+	Msg            string      `json:"msg"`
+	Data           interface{} `json:"data"`
+	ResponseStatus string      `json:"response_status"`
 }
 
 var help = `用法:
@@ -198,20 +198,13 @@ func Pull() {
 		return
 	}
 
-	body, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", ServerHost, UserToken))
+	data, err := GetCall(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程列表异常:%s", err.Error())
 		return
 	}
 
-	var ret respData
-	json.Unmarshal(body, &ret)
-	if ret.Msg != "" {
-		log.Printf("拉取远程列表异常:%s", ret.Msg)
-		return
-	}
-
-	remotePosts, _ := ret.Data.([]interface{})
+	remotePosts, _ := data.([]interface{})
 	for _, v := range remotePosts {
 		var remote DocDesc
 		m := v.(map[string]interface{})
@@ -228,21 +221,15 @@ func Pull() {
 		}
 
 		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=get&filename=%s", ServerHost, UserToken, remote.FileName)
-		body, err := pkg.HttpGet(url)
+		retData, err := GetCall(url)
 		if err != nil {
 			log.Printf("拉取文章异常:%s,文章:%s", err.Error(), remote.FileName)
 			continue
 		}
 
-		var ret respData
-		json.Unmarshal(body, &ret)
-		if ret.Msg != "" {
-			log.Printf("拉取远程文章异常:%s,文章:%s", ret.Msg, remote.FileName)
-			continue
-		}
-		data, ok := ret.Data.(map[string]interface{})
+		data, ok := retData.(map[string]interface{})
 		if !ok {
-			log.Printf("拉取远程文章格式异常:%v,文章:%s", ret.Data, remote.FileName)
+			log.Printf("拉取远程文章格式异常:%v,文章:%s", retData, remote.FileName)
 			continue
 		}
 
@@ -280,21 +267,14 @@ func Push() {
 		return
 	}
 
-	ret, err := pkg.HttpGet(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", ServerHost, UserToken))
+	data, err := GetCall(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
 	}
 
-	r := respData{}
-	json.Unmarshal(ret, &r)
-	if r.Msg != "" {
-		log.Printf("读取远程文章列表异常:%s", r.Msg)
-		return
-	}
-
 	remote := make(map[string]DocDesc)
-	l, _ := r.Data.([]interface{})
+	l, _ := data.([]interface{})
 	for _, v := range l {
 		m := v.(map[string]interface{})
 		var a DocDesc
@@ -327,16 +307,9 @@ func Push() {
 			"title":     {v.Title},
 		}
 		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=add&filename=%s", ServerHost, UserToken, v.FileName)
-		resp, err := pkg.HttpPost(url, form)
+		_, err = PostCall(url, form)
 		if err != nil {
-			log.Printf("上传文章异常:%s,文章:%s", err.Error(), v.FileName)
-			continue
-		}
-
-		ret := respData{}
-		err = json.Unmarshal(resp, &ret)
-		if ret.Msg != "" {
-			log.Printf("推到远程出现异常:%s,文件:%s", ret.Msg, v.FileName)
+			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
 			continue
 		}
 
@@ -560,6 +533,9 @@ func Status() {
 
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
 func checkFilePath(path string) error {
+	if strings.Contains(path, " ") {
+		return errors.New("路径不能含有空格")
+	}
 	if strings.Contains(path, "/") || strings.Contains(path, "\\") {
 		return errors.New("不支持多级路径")
 	}
@@ -570,6 +546,12 @@ func checkFilePath(path string) error {
 }
 
 func inIgnoreList(file string) bool {
+	var ignoreList []string
+	b, _ := ioutil.ReadFile("ignore")
+	if len(b) > 0 {
+		ignoreList = strings.Split(string(b), "\n")
+	}
+
 	for _, v := range ignoreList {
 		if v == file {
 			return true
@@ -605,16 +587,14 @@ func replaceImg(fileName string) error {
 		return nil
 	}
 
-	body, err := pkg.HttpGet(ServerHost + "/basic/getPicToken?token=" + UserToken)
+	data, err := GetCall(ServerHost + "/basic/getPicToken?token=" + UserToken)
 	if err != nil {
 		return errors.New("拉取图片上传token异常:" + err.Error())
 	}
 
-	var ret respData
-	json.Unmarshal(body, &ret)
-	i, ok := ret.Data.(map[string]interface{})
+	i, ok := data.(map[string]interface{})
 	if !ok {
-		return errors.New(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%s", string(body)))
+		return errors.New(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%v", data))
 	}
 	imgToken := i["token"].(string)
 	if imgToken == "" {
@@ -725,5 +705,41 @@ func getWorkFilePath(fileName string) string {
 
 // getImgPath  workDir+"/"+remote.FileName
 func getImgPath(fileName string) string {
-	return fmt.Sprintf("%s%srepo%simg%s%s", workDir, fileSep,fileSep, fileSep, fileName)
+	return fmt.Sprintf("%s%srepo%simg%s%s", workDir, fileSep, fileSep, fileSep, fileName)
+}
+
+func GetCall(url string) (interface{}, error) {
+	ret, err := pkg.HttpGet(url)
+	if err != nil {
+		return "", err
+	}
+
+	r := respData{}
+	err = json.Unmarshal(ret, &r)
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("err:%s,resp:%s", err.Error(), string(ret)))
+	}
+
+	if r.ResponseStatus != "success" {
+		return "", errors.New("errMsg:" + r.Msg)
+	}
+	return r.Data, nil
+}
+
+func PostCall(url string, form url.Values) (interface{}, error) {
+	ret, err := pkg.HttpPost(url, form)
+	if err != nil {
+		return "", err
+	}
+
+	r := respData{}
+	err = json.Unmarshal(ret, &r)
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("err:%s,resp:%s", err.Error(), string(ret)))
+	}
+
+	if r.ResponseStatus != "success" {
+		return "", errors.New("errMsg:" + r.Msg)
+	}
+	return r.Data, nil
 }

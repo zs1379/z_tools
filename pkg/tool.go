@@ -60,7 +60,7 @@ func HttpPost(url string, form url.Values) ([]byte, error) {
 	data := bytes.NewBufferString(form.Encode())
 	rsp, err := http.Post(url, "application/x-www-form-urlencoded", data)
 	if err != nil {
-
+		return nil, err
 	}
 	defer rsp.Body.Close()
 	body, err := ioutil.ReadAll(rsp.Body)
