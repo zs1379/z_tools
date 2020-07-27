@@ -87,6 +87,11 @@ func main() {
 		return
 	}
 
+	env := ReadEnv()
+	if env == "test" {
+		ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
+	}
+
 	switch method {
 	case "init":
 		if len(os.Args) < 3 {
@@ -94,7 +99,15 @@ func main() {
 			return
 		}
 		token := os.Args[2]
-		InitToken(token)
+		if len(os.Args) < 3 {
+			log.Printf("请输入token")
+			return
+		}
+		env := "online"
+		if len(os.Args) > 3 {
+			env = os.Args[3]
+		}
+		InitDoc(token, env)
 	case "pull":
 		Pull()
 	case "new":
@@ -176,17 +189,27 @@ func WriteIndex(m map[string]*DocDesc) error {
 	return nil
 }
 
-func InitToken(token string) {
+func InitDoc(token string, env string) {
 	err := ioutil.WriteFile(fmt.Sprintf("%s%srepo%stoken", workDir, fileSep, fileSep), []byte(token), 0644)
 	if err != nil {
 		log.Printf("初始化token异常:%s", err.Error())
 		return
 	}
-	log.Printf("初始化token成功")
+	err = ioutil.WriteFile(fmt.Sprintf("%s%srepo%senv", workDir, fileSep, fileSep), []byte(env), 0644)
+	if err != nil {
+		log.Printf("初始化env异常:%s", err.Error())
+		return
+	}
+	log.Printf("初始化成功")
 }
 
 func ReadToken() string {
 	b, _ := ioutil.ReadFile(fmt.Sprintf("%s%srepo%stoken", workDir, fileSep, fileSep))
+	return string(b)
+}
+
+func ReadEnv() string {
+	b, _ := ioutil.ReadFile(fmt.Sprintf("%s%srepo%senv", workDir, fileSep, fileSep))
 	return string(b)
 }
 
@@ -208,9 +231,14 @@ func Pull() {
 	for _, v := range remotePosts {
 		var remote DocDesc
 		m := v.(map[string]interface{})
-		remote.FileName = m["file_name"].(string)
-		remote.Md5 = m["file_md5"].(string)
-		remote.UpdateTime = m["update_time"].(string)
+		remote.FileName, _ = m["file_name"].(string)
+		remote.Md5, _ = m["file_md5"].(string)
+		remote.UpdateTime, _ = m["update_time"].(string)
+
+		if remote.FileName == "" || remote.Md5 == "" || remote.UpdateTime == "" {
+			log.Printf("拉取文章异常,返回字段不全:file:%s,md5:%s,time:%s", remote.FileName, remote.Md5, remote.UpdateTime)
+			continue
+		}
 
 		// 更新本地repo
 		local, ok := localPosts[remote.FileName]
@@ -220,10 +248,10 @@ func Pull() {
 			}
 		}
 
-		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=get&filename=%s", ServerHost, UserToken, remote.FileName)
-		retData, err := GetCall(url)
+		form := url.Values{"filename": {remote.FileName}}
+		retData, err := PostCall(fmt.Sprintf("%s/info/clientPost?token=%s&action=get", ServerHost, UserToken), form)
 		if err != nil {
-			log.Printf("拉取文章异常:%s,文章:%s", err.Error(), remote.FileName)
+			log.Printf("拉取文章详情异常:%s,文章:%s", err.Error(), remote.FileName)
 			continue
 		}
 
@@ -233,7 +261,7 @@ func Pull() {
 			continue
 		}
 
-		content := data["content"].(string)
+		content, _ := data["content"].(string)
 		remote.Title = data["title"].(string)
 
 		err = pkg.Write2File([]byte(content), getRepoFilePath(remote.Md5))
@@ -278,9 +306,14 @@ func Push() {
 	for _, v := range l {
 		m := v.(map[string]interface{})
 		var a DocDesc
-		a.FileName = m["file_name"].(string)
-		a.Md5 = m["file_md5"].(string)
-		a.UpdateTime = m["update_time"].(string)
+		a.FileName, _ = m["file_name"].(string)
+		a.Md5, _ = m["file_md5"].(string)
+		a.UpdateTime, _ = m["update_time"].(string)
+		if a.FileName == "" || a.Md5 == "" || a.UpdateTime == "" {
+			log.Printf("拉取文章异常,返回字段不全:file:%s,md5:%s,time:%s", a.FileName, a.Md5, a.UpdateTime)
+			continue
+		}
+
 		remote[a.FileName] = a
 	}
 
