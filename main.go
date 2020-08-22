@@ -12,8 +12,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/urfave/cli/v2"
 
 	"z_tools/pkg"
 	"z_tools/pkg/qiniu"
@@ -23,6 +26,7 @@ var (
 	workDir    string // 工作目录
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
+	env        string // 环境
 	fileSep    = "/"  // 目录分隔符
 )
 
@@ -42,23 +46,114 @@ type respData struct {
 	ResponseStatus string      `json:"response_status"`
 }
 
-var help = `用法:
-	./doc 命令 参数
-支持的命令有:
-	init        初始化token
-	new         新建文章
-	add         工作区文章新增/变更提交到本地仓库 
-	pull        服务器拉取最新文章列表
-	push        本地仓库提交到服务器
-	status      比对本地仓库和工作区的文件变更
-	checkout    恢复本地仓库的指定文件到工作区 参数:文件名
-`
-
 func main() {
-	if len(os.Args) == 1 {
-		log.Printf(help)
-		return
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "print only the version",
 	}
+
+	app := &cli.App{
+		Version: "0.0.1",
+		Usage:   "文章上传助手",
+		Commands: []*cli.Command{
+			{
+				Name:  "init",
+				Usage: "初始化token",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入token")
+						return nil
+					}
+					env := "online"
+					if c.NArg() >= 2 {
+						env = c.Args().Get(1)
+					}
+					InitDoc(c.Args().Get(0), env)
+					return nil
+				},
+			},
+			{
+				Name:  "new",
+				Usage: "新建文章",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入文件名")
+						return nil
+					}
+					fileName := c.Args().Get(0)
+					NewDoc(fileName)
+					return nil
+				},
+			},
+			{
+				Name:  "add",
+				Usage: "工作区文章新增/变更提交到本地仓库 ",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入文件名")
+						return nil
+					}
+					fileName := c.Args().Get(0)
+					Add(fileName)
+					return nil
+				},
+			},
+			{
+				Name:  "pull",
+				Usage: "服务器拉取最新文章列表",
+				Action: func(c *cli.Context) error {
+					Pull()
+					return nil
+				},
+			},
+			{
+				Name:  "push",
+				Usage: "本地仓库提交到服务器",
+				Action: func(c *cli.Context) error {
+					Push()
+					return nil
+				},
+			},
+			{
+				Name:  "rm",
+				Usage: "删除本地文件",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入文件名")
+						return nil
+					}
+					fileName := c.Args().Get(0)
+					Rm(fileName)
+					return nil
+				},
+			},
+			{
+				Name:  "status",
+				Usage: "比对本地仓库和工作区的文件变更",
+				Action: func(c *cli.Context) error {
+					Status()
+					return nil
+				},
+			},
+			{
+				Name:  "checkout",
+				Usage: "恢复本地仓库的指定文件到工作区 参数:文件名",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入文件名")
+						return nil
+					}
+					fileName := c.Args().Get(0)
+					Checkout(fileName)
+					return nil
+				},
+			},
+		},
+	}
+
+	sort.Sort(cli.FlagsByName(app.Flags))
+	sort.Sort(cli.CommandsByName(app.Commands))
 
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
@@ -80,73 +175,15 @@ func main() {
 		return
 	}
 
-	method := strings.ToLower(os.Args[1])
-
-	UserToken = ReadToken()
-	if UserToken == "" && method != "init" {
-		log.Printf("token为空,请先初始化token")
-		return
-	}
-
-	env := ReadEnv()
+	env = ReadEnv()
 	if env == "test" {
 		ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	}
+	UserToken = ReadToken()
 
-	switch method {
-	case "init":
-		if len(os.Args) < 3 {
-			log.Printf("请输入token")
-			return
-		}
-		token := os.Args[2]
-		if len(os.Args) < 3 {
-			log.Printf("请输入token")
-			return
-		}
-		env := "online"
-		if len(os.Args) > 3 {
-			env = os.Args[3]
-		}
-		InitDoc(token, env)
-	case "pull":
-		Pull()
-	case "new":
-		if len(os.Args) < 3 {
-			log.Printf("请输入文件名")
-			return
-		}
-		fileName := os.Args[2]
-		NewDoc(fileName)
-	case "add":
-		if len(os.Args) < 3 {
-			log.Printf("请输入文件名")
-			return
-		}
-		fileName := os.Args[2]
-		Add(fileName)
-	case "rm":
-		if len(os.Args) < 3 {
-			log.Printf("请输入文件名")
-			return
-		}
-		fileName := os.Args[2]
-		Rm(fileName)
-	case "push":
-		Push()
-	case "checkout":
-		if len(os.Args) < 3 {
-			log.Printf("请输入文件名")
-			return
-		}
-		fileName := os.Args[2]
-		Checkout(fileName)
-	case "status":
-		Status()
-	case "help":
-		log.Printf(help)
-	default:
-		log.Printf("未支持操作:%s", method)
+	err = app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -221,7 +258,7 @@ func Pull() {
 		return
 	}
 
-	data, err := GetCall(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", ServerHost, UserToken))
+	data, err := GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程列表异常:%s", err.Error())
 		return
@@ -262,7 +299,7 @@ func Pull() {
 		}
 
 		form := url.Values{"filename": {remote.FileName}}
-		retData, err := PostCall(fmt.Sprintf("%s/info/clientPost?token=%s&action=get", ServerHost, UserToken), form)
+		retData, err := PostCall(fmt.Sprintf("%s/info/client?token=%s&action=get", ServerHost, UserToken), form)
 		if err != nil {
 			log.Printf("拉取文章详情异常:%s,文章:%s", err.Error(), remote.FileName)
 			continue
@@ -308,7 +345,7 @@ func Push() {
 		return
 	}
 
-	data, err := GetCall(fmt.Sprintf("%s/info/clientPost?action=getList&token=%s", ServerHost, UserToken))
+	data, err := GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
@@ -355,7 +392,7 @@ func Push() {
 		// 本地删除的情况,单独调用接口
 		if v.Status == "-2" && r.Status != "-2" {
 			form := url.Values{"filename": {v.FileName}}
-			url := fmt.Sprintf("%s/info/clientPost?token=%s&action=delete", ServerHost, UserToken)
+			url := fmt.Sprintf("%s/info/client?token=%s&action=delete", ServerHost, UserToken)
 			_, err = PostCall(url, form)
 			if err != nil {
 				log.Printf("删除远程文章异常:%s,文章:%s", err.Error(), v.FileName)
@@ -379,7 +416,7 @@ func Push() {
 			"content":   {content},
 			"title":     {v.Title},
 		}
-		url := fmt.Sprintf("%s/info/clientPost?token=%s&action=add&filename=%s", ServerHost, UserToken, v.FileName)
+		url := fmt.Sprintf("%s/info/client?token=%s&action=add&filename=%s", ServerHost, UserToken, v.FileName)
 		_, err = PostCall(url, form)
 		if err != nil {
 			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
