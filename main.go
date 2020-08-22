@@ -32,6 +32,7 @@ type DocDesc struct {
 	FileName   string `json:"file_name"`   // 文件名称
 	UpdateTime string `json:"update_time"` // 文章更新时间
 	Md5        string `json:"file_md5"`    // 文章MD5
+	Status     string `json:"status"`      // 文件状态 -2:自己删除 -3:管理员删除
 }
 
 // respData 返回给客户端的数据
@@ -124,6 +125,13 @@ func main() {
 		}
 		fileName := os.Args[2]
 		Add(fileName)
+	case "rm":
+		if len(os.Args) < 3 {
+			log.Printf("请输入文件名")
+			return
+		}
+		fileName := os.Args[2]
+		Rm(fileName)
 	case "push":
 		Push()
 	case "checkout":
@@ -137,14 +145,6 @@ func main() {
 		Status()
 	case "help":
 		log.Printf(help)
-	case "md5":
-		if len(os.Args) < 3 {
-			log.Printf("请输入文件名")
-			return
-		}
-		fileName := os.Args[2]
-		md5, err := pkg.GetFileMd5(fileName)
-		log.Printf("md5:%s,err:%s", md5, err.Error())
 	default:
 		log.Printf("未支持操作:%s", method)
 	}
@@ -234,9 +234,22 @@ func Pull() {
 		remote.FileName, _ = m["file_name"].(string)
 		remote.Md5, _ = m["file_md5"].(string)
 		remote.UpdateTime, _ = m["update_time"].(string)
+		remote.Status, _ = m["status"].(string)
 
 		if remote.FileName == "" || remote.Md5 == "" || remote.UpdateTime == "" {
 			log.Printf("拉取文章异常,返回字段不全:file:%s,md5:%s,time:%s", remote.FileName, remote.Md5, remote.UpdateTime)
+			continue
+		}
+
+		// 如果文件远程被删除,则本地也相应删除
+		if remote.Status == "-2" || remote.Status == "-3" {
+			local, ok := localPosts[remote.FileName]
+			if ok && local.Status != "-2" && local.Status != "-3" {
+				os.Remove(getRepoFilePath(local.Md5))
+				os.Remove(local.FileName)
+				log.Printf("文件远程被删除,删除本地文件成功:%s", remote.FileName)
+			}
+			localPosts[remote.FileName] = &remote
 			continue
 		}
 
@@ -309,20 +322,47 @@ func Push() {
 		a.FileName, _ = m["file_name"].(string)
 		a.Md5, _ = m["file_md5"].(string)
 		a.UpdateTime, _ = m["update_time"].(string)
+		a.Status, _ = m["status"].(string)
+
 		if a.FileName == "" || a.Md5 == "" || a.UpdateTime == "" {
 			log.Printf("拉取文章异常,返回字段不全:file:%s,md5:%s,time:%s", a.FileName, a.Md5, a.UpdateTime)
 			continue
 		}
 
 		remote[a.FileName] = a
+
+		// 如果远程文章被删除,则本地也一并删除
+		if a.Status == "-3" || a.Status == "-2" {
+			local, ok := localList[a.FileName]
+			if ok && local.Status != "-2" && local.Status != "-3" {
+				os.Remove(getRepoFilePath(local.Md5))
+				os.Remove(local.FileName)
+				log.Printf("文件远程被删除,删除本地文件成功:%s", a.FileName)
+			}
+			localList[a.FileName] = &a
+		}
 	}
+	WriteIndex(localList)
 
 	for _, v := range localList {
 		r, ok := remote[v.FileName]
 		if ok {
-			if r.Md5 == v.Md5 || timeCompare(r.UpdateTime, v.UpdateTime) {
+			if (r.Md5 == v.Md5 && r.Status == v.Status) || timeCompare(r.UpdateTime, v.UpdateTime) {
 				continue
 			}
+		}
+
+		// 本地删除的情况,单独调用接口
+		if v.Status == "-2" && r.Status != "-2" {
+			form := url.Values{"filename": {v.FileName}}
+			url := fmt.Sprintf("%s/info/clientPost?token=%s&action=delete", ServerHost, UserToken)
+			_, err = PostCall(url, form)
+			if err != nil {
+				log.Printf("删除远程文章异常:%s,文章:%s", err.Error(), v.FileName)
+			} else {
+				log.Printf("删除远程文章成功,文章:%s", v.FileName)
+			}
+			continue
 		}
 
 		b, err := ioutil.ReadFile(getRepoFilePath(v.Md5))
@@ -393,6 +433,42 @@ func Add(fileName string) {
 	} else {
 		doAdd(fileName)
 	}
+	return
+}
+
+// Rm 删除文件
+func Rm(fileName string) {
+	localPosts, err := ReadIndex()
+	if err != nil {
+		log.Printf("读取索引异常:%s", err.Error())
+		return
+	}
+
+	err = checkFilePath(fileName)
+	if err != nil {
+		log.Printf("文件名非法,err:%s,文件名:%s", err.Error(), fileName)
+		return
+	}
+
+	local, ok := localPosts[fileName]
+	if !ok {
+		log.Printf("本地仓库不存在该文件:%s", fileName)
+		return
+	}
+
+	if local.Status == "-3" || local.Status == "-2" {
+		log.Printf("该文件已经被删除过:%s", fileName)
+		return
+	}
+
+	local.Status = "-2"
+	local.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
+
+	os.Remove(fileName)
+	os.Remove(getRepoFilePath(local.Md5))
+	localPosts[local.FileName] = local
+
+	WriteIndex(localPosts)
 	return
 }
 
@@ -558,7 +634,7 @@ func Status() {
 
 	for _, v := range localRepo {
 		b, _ := pkg.PathExists(getWorkFilePath(v.FileName))
-		if !b {
+		if !b && v.Status != "-2" && v.Status != "-3" {
 			log.Printf("文件被删除:%s", v.FileName)
 		}
 	}
