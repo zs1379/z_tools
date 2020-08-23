@@ -3,8 +3,9 @@ package pkg
 import (
 	"bytes"
 	"crypto/md5"
-	"crypto/tls"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -142,35 +143,51 @@ func GetKey() string {
 	return GetRandomString(3) + strconv.FormatInt(time.Now().Unix(), 10) + GetRandomString(3)
 }
 
-// DownLoadFile 下载文件
-func DownLoadFile(URL string, fileName string) error {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+func TimeCompare(timeStr1, timeStr2 string) bool {
+	time1, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr1, time.Local)
+	time2, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr2, time.Local)
+	return time1.Unix() > time2.Unix()
+}
+
+// respData 返回给客户端的数据
+type RespData struct {
+	Msg            string      `json:"msg"`
+	Data           interface{} `json:"data"`
+	ResponseStatus string      `json:"response_status"`
+}
+
+func GetCall(url string) (interface{}, error) {
+	ret, err := HttpGet(url)
+	if err != nil {
+		return "", err
 	}
 
-	client := &http.Client{Transport: tr}
-	headers := make(http.Header)
-	req, err := http.NewRequest("GET", URL, nil)
+	r := RespData{}
+	err = json.Unmarshal(ret, &r)
 	if err != nil {
-		return err
-	}
-	headers.Set("Accept-Encoding", "gzip, deflate")
-	req.Header = headers
-	res, err := client.Do(req)
-	if err != nil {
-		return err
+		return "", errors.New(fmt.Sprintf("err:%s,resp:%s", err.Error(), string(ret)))
 	}
 
-	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
+	if r.ResponseStatus != "success" {
+		return "", errors.New("errMsg:" + r.Msg)
+	}
+	return r.Data, nil
+}
+
+func PostCall(url string, form url.Values) (interface{}, error) {
+	ret, err := HttpPost(url, form)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	err = ioutil.WriteFile(fileName, body, 0644)
+	r := RespData{}
+	err = json.Unmarshal(ret, &r)
 	if err != nil {
-		return err
+		return "", errors.New(fmt.Sprintf("err:%s,resp:%s", err.Error(), string(ret)))
 	}
 
-	return nil
+	if r.ResponseStatus != "success" {
+		return "", errors.New("errMsg:" + r.Msg)
+	}
+	return r.Data, nil
 }

@@ -9,9 +9,7 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -23,11 +21,19 @@ import (
 )
 
 var (
-	workDir    string // 工作目录
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	fileSep    = "/"  // 目录分隔符
+	version    = "0.0.1"
+)
+
+var (
+	repoObjPath   = "./.repo/objects/"
+	tokenPath     = "./.repo/token"
+	envPath       = "./.repo/env"
+	indexPath     = "./.repo/index"
+	imgPath       = "./img/"
+	workPostsPath = "./posts/"
 )
 
 // DocDesc 文章描述
@@ -39,11 +45,22 @@ type DocDesc struct {
 	Status     string `json:"status"`      // 文件状态 -2:自己删除 -3:管理员删除
 }
 
-// respData 返回给客户端的数据
-type respData struct {
-	Msg            string      `json:"msg"`
-	Data           interface{} `json:"data"`
-	ResponseStatus string      `json:"response_status"`
+func init() {
+	err := os.MkdirAll(workPostsPath, os.ModePerm)
+	if err != nil {
+		log.Printf("创建工作区目录异常:%s", err.Error())
+		return
+	}
+	err = os.MkdirAll(imgPath, os.ModePerm)
+	if err != nil {
+		log.Printf("创建img目录异常:%s", err.Error())
+		return
+	}
+	err = os.MkdirAll(repoObjPath, os.ModePerm)
+	if err != nil {
+		log.Printf("创建object目录异常:%s", err.Error())
+		return
+	}
 }
 
 func main() {
@@ -54,7 +71,7 @@ func main() {
 	}
 
 	app := &cli.App{
-		Version: "0.0.1",
+		Version: version,
 		Usage:   "文章上传助手",
 		Commands: []*cli.Command{
 			{
@@ -124,7 +141,7 @@ func main() {
 						return nil
 					}
 					fileName := c.Args().Get(0)
-					Rm(fileName)
+					Rm(workPostsPath+fileName)
 					return nil
 				},
 			},
@@ -155,33 +172,13 @@ func main() {
 	sort.Sort(cli.FlagsByName(app.Flags))
 	sort.Sort(cli.CommandsByName(app.Commands))
 
-	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		log.Printf("获取当前目录异常:%s", err.Error())
-		return
-	}
-	workDir = dir
-
-	sysType := runtime.GOOS
-	if sysType == "windows" {
-		fileSep = "\\"
-	} else {
-		fileSep = "/"
-	}
-
-	err = os.MkdirAll(workDir+"/repo/img", os.ModePerm)
-	if err != nil {
-		log.Printf("创建repo目录异常:%s", err.Error())
-		return
-	}
-
 	env = ReadEnv()
 	if env == "test" {
 		ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	}
 	UserToken = ReadToken()
 
-	err = app.Run(os.Args)
+	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -191,7 +188,7 @@ func main() {
 func ReadIndex() (map[string]*DocDesc, error) {
 	m := make(map[string]*DocDesc)
 
-	b, _ := ioutil.ReadFile(getIndexPath())
+	b, _ := ioutil.ReadFile(indexPath)
 	if len(b) == 0 {
 		return m, nil
 	}
@@ -219,7 +216,7 @@ func WriteIndex(m map[string]*DocDesc) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(getIndexPath(), b, 0644)
+	err = ioutil.WriteFile(indexPath, b, 0644)
 	if err != nil {
 		return err
 	}
@@ -227,12 +224,12 @@ func WriteIndex(m map[string]*DocDesc) error {
 }
 
 func InitDoc(token string, env string) {
-	err := ioutil.WriteFile(fmt.Sprintf("%s%srepo%stoken", workDir, fileSep, fileSep), []byte(token), 0644)
+	err := ioutil.WriteFile(tokenPath, []byte(token), 0644)
 	if err != nil {
 		log.Printf("初始化token异常:%s", err.Error())
 		return
 	}
-	err = ioutil.WriteFile(fmt.Sprintf("%s%srepo%senv", workDir, fileSep, fileSep), []byte(env), 0644)
+	err = ioutil.WriteFile(envPath, []byte(env), 0644)
 	if err != nil {
 		log.Printf("初始化env异常:%s", err.Error())
 		return
@@ -241,24 +238,29 @@ func InitDoc(token string, env string) {
 }
 
 func ReadToken() string {
-	b, _ := ioutil.ReadFile(fmt.Sprintf("%s%srepo%stoken", workDir, fileSep, fileSep))
+	b, _ := ioutil.ReadFile(tokenPath)
 	return string(b)
 }
 
 func ReadEnv() string {
-	b, _ := ioutil.ReadFile(fmt.Sprintf("%s%srepo%senv", workDir, fileSep, fileSep))
+	b, _ := ioutil.ReadFile(envPath)
 	return string(b)
 }
 
 // Pull 拉取远程
 func Pull() {
+	if UserToken == "" {
+		log.Printf("用户token为空,请先初始化")
+		return
+	}
+
 	localPosts, err := ReadIndex()
 	if err != nil {
 		log.Printf("读取索引异常:%s", err.Error())
 		return
 	}
 
-	data, err := GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
+	data, err := pkg.GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程列表异常:%s", err.Error())
 		return
@@ -282,7 +284,7 @@ func Pull() {
 		if remote.Status == "-2" || remote.Status == "-3" {
 			local, ok := localPosts[remote.FileName]
 			if ok && local.Status != "-2" && local.Status != "-3" {
-				os.Remove(getRepoFilePath(local.Md5))
+				os.Remove(repoObjPath+local.Md5)
 				os.Remove(local.FileName)
 				log.Printf("文件远程被删除,删除本地文件成功:%s", remote.FileName)
 			}
@@ -293,13 +295,13 @@ func Pull() {
 		// 更新本地repo
 		local, ok := localPosts[remote.FileName]
 		if ok {
-			if local.Md5 == remote.Md5 || timeCompare(local.UpdateTime, remote.UpdateTime) {
+			if local.Md5 == remote.Md5 || pkg.TimeCompare(local.UpdateTime, remote.UpdateTime) {
 				continue
 			}
 		}
 
 		form := url.Values{"filename": {remote.FileName}}
-		retData, err := PostCall(fmt.Sprintf("%s/info/client?token=%s&action=get", ServerHost, UserToken), form)
+		retData, err := pkg.PostCall(fmt.Sprintf("%s/info/client?token=%s&action=get", ServerHost, UserToken), form)
 		if err != nil {
 			log.Printf("拉取文章详情异常:%s,文章:%s", err.Error(), remote.FileName)
 			continue
@@ -314,20 +316,20 @@ func Pull() {
 		content, _ := data["content"].(string)
 		remote.Title = data["title"].(string)
 
-		err = pkg.Write2File([]byte(content), getRepoFilePath(remote.Md5))
+		err = pkg.Write2File([]byte(content), repoObjPath+remote.Md5)
 		if err != nil {
 			log.Printf("写入文章异常:%s,文章:%s", err.Error(), remote.FileName)
 			continue
 		}
 
-		_, err = pkg.CopyFile(getWorkFilePath(remote.FileName), getRepoFilePath(remote.Md5))
+		_, err = pkg.CopyFile(workPostsPath+remote.FileName, repoObjPath+remote.Md5)
 		if err != nil {
 			log.Printf("拷贝文章异常:%s,文章:%s", err.Error(), remote.FileName)
 			continue
 		}
 
 		if local != nil {
-			os.Remove(getRepoFilePath(local.Md5))
+			os.Remove(repoObjPath+local.Md5)
 		}
 
 		log.Printf("拉取远程文章成功:%s", remote.FileName)
@@ -339,13 +341,18 @@ func Pull() {
 
 // Push 推到远程服务器
 func Push() {
+	if UserToken == "" {
+		log.Printf("用户token为空,请先初始化")
+		return
+	}
+
 	localList, err := ReadIndex()
 	if err != nil {
 		log.Printf("读取索引异常:%s", err.Error())
 		return
 	}
 
-	data, err := GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
+	data, err := pkg.GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
@@ -372,7 +379,7 @@ func Push() {
 		if a.Status == "-3" || a.Status == "-2" {
 			local, ok := localList[a.FileName]
 			if ok && local.Status != "-2" && local.Status != "-3" {
-				os.Remove(getRepoFilePath(local.Md5))
+				os.Remove(repoObjPath+local.Md5)
 				os.Remove(local.FileName)
 				log.Printf("文件远程被删除,删除本地文件成功:%s", a.FileName)
 			}
@@ -384,7 +391,7 @@ func Push() {
 	for _, v := range localList {
 		r, ok := remote[v.FileName]
 		if ok {
-			if (r.Md5 == v.Md5 && r.Status == v.Status) || timeCompare(r.UpdateTime, v.UpdateTime) {
+			if (r.Md5 == v.Md5 && r.Status == v.Status) || pkg.TimeCompare(r.UpdateTime, v.UpdateTime) {
 				continue
 			}
 		}
@@ -393,7 +400,7 @@ func Push() {
 		if v.Status == "-2" && r.Status != "-2" {
 			form := url.Values{"filename": {v.FileName}}
 			url := fmt.Sprintf("%s/info/client?token=%s&action=delete", ServerHost, UserToken)
-			_, err = PostCall(url, form)
+			_, err = pkg.PostCall(url, form)
 			if err != nil {
 				log.Printf("删除远程文章异常:%s,文章:%s", err.Error(), v.FileName)
 			} else {
@@ -402,7 +409,7 @@ func Push() {
 			continue
 		}
 
-		b, err := ioutil.ReadFile(getRepoFilePath(v.Md5))
+		b, err := ioutil.ReadFile(repoObjPath+v.Md5)
 		if err != nil {
 			log.Printf("读取文章异常:%s,文章:%s", err.Error(), v.FileName)
 			continue
@@ -417,7 +424,7 @@ func Push() {
 			"title":     {v.Title},
 		}
 		url := fmt.Sprintf("%s/info/client?token=%s&action=add&filename=%s", ServerHost, UserToken, v.FileName)
-		_, err = PostCall(url, form)
+		_, err = pkg.PostCall(url, form)
 		if err != nil {
 			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
 			continue
@@ -435,7 +442,7 @@ func NewDoc(fileName string) {
 		return
 	}
 
-	exist, _ := pkg.PathExists(fileName)
+	exist, _ := pkg.PathExists(workPostsPath+fileName)
 	if exist {
 		log.Printf("文件已经存在,文件:%s", fileName)
 		return
@@ -445,7 +452,7 @@ title: %s
 ---`
 
 	docContent := fmt.Sprintf(docFormat, fileName[0:len(fileName)-3])
-	err = ioutil.WriteFile(getWorkFilePath(fileName), []byte(docContent), 0644)
+	err = ioutil.WriteFile(workPostsPath+fileName, []byte(docContent), 0644)
 	if err != nil {
 		log.Printf("本地创建文章异常:%s,文章:%s", err.Error(), fileName)
 		return
@@ -456,9 +463,9 @@ title: %s
 // Add 文件工作区加入到本地仓库
 func Add(fileName string) {
 	if fileName == "." {
-		files, err := ioutil.ReadDir(workDir)
+		files, err := ioutil.ReadDir(workPostsPath)
 		if err != nil {
-			log.Printf("读取工作目录异常:%s,目录:%s", err.Error(), workDir)
+			log.Printf("读取工作目录异常:%s,目录:%s", err.Error(), workPostsPath)
 			return
 		}
 		for _, s := range files {
@@ -501,8 +508,8 @@ func Rm(fileName string) {
 	local.Status = "-2"
 	local.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
 
-	os.Remove(fileName)
-	os.Remove(getRepoFilePath(local.Md5))
+	os.Remove(workPostsPath+fileName)
+	os.Remove(repoObjPath+local.Md5)
 	localPosts[local.FileName] = local
 
 	WriteIndex(localPosts)
@@ -523,7 +530,7 @@ func doAdd(fileName string) {
 		return
 	}
 
-	exist, err := pkg.PathExists(fileName)
+	exist, err := pkg.PathExists(workPostsPath+fileName)
 	if err != nil {
 		log.Printf("判断文件是否存在异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
@@ -533,24 +540,24 @@ func doAdd(fileName string) {
 		return
 	}
 
-	if pkg.GetFileSize(fileName) > 2*1024*2014 {
+	if pkg.GetFileSize(workPostsPath+fileName) > 2*1024*2014 {
 		log.Printf("文章大小不支持2M以上,文件名:%s,文章大小:%d", fileName, pkg.GetFileSize(fileName))
 		return
 	}
 
-	err = replaceImg(fileName)
+	err = replaceImg(workPostsPath+fileName)
 	if err != nil {
 		log.Printf("图片替换异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
 	}
 
-	fileMd5, err := pkg.GetFileMd5(fileName)
+	fileMd5, err := pkg.GetFileMd5(workPostsPath+fileName)
 	if err != nil {
 		log.Printf("获取文件md5异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
 	}
 
-	title, err := getMDTile(fileName)
+	title, err := getMDTile(workPostsPath+fileName)
 	if err != nil {
 		log.Printf("获取文件title异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
@@ -578,7 +585,7 @@ func doAdd(fileName string) {
 		localPosts[uuid] = a
 	} else {
 		// 移除旧文件
-		os.Remove(getRepoFilePath(repoArticle.Md5))
+		os.Remove(repoObjPath+repoArticle.Md5)
 
 		repoArticle.Title = title
 		repoArticle.Md5 = fileMd5
@@ -586,7 +593,7 @@ func doAdd(fileName string) {
 		localPosts[uuid] = repoArticle
 	}
 
-	_, err = pkg.CopyFile(getRepoFilePath(fileMd5), fileName)
+	_, err = pkg.CopyFile(repoObjPath+fileMd5, workPostsPath+fileName)
 	if err != nil {
 		log.Printf("写入索引异常:%s", err.Error())
 	}
@@ -605,7 +612,7 @@ func Checkout(fileName string) {
 
 	if fileName == "." {
 		for _, v := range localRepo {
-			_, err = pkg.CopyFile(v.FileName, getRepoFilePath(v.Md5))
+			_, err = pkg.CopyFile(workPostsPath+v.FileName, repoObjPath+v.Md5)
 			if err != nil {
 				log.Printf("拷贝文件异常:%s,文件名:%s", err.Error(), v.FileName)
 				return
@@ -621,7 +628,7 @@ func Checkout(fileName string) {
 		exist := false
 		for _, v := range localRepo {
 			if v.FileName == fileName {
-				_, err = pkg.CopyFile(v.FileName, getRepoFilePath(v.Md5))
+				_, err = pkg.CopyFile(workPostsPath+v.FileName, repoObjPath+v.Md5)
 				if err != nil {
 					log.Printf("拷贝文件异常:%s,文件名:%s", err.Error(), v.FileName)
 					return
@@ -644,7 +651,7 @@ func Status() {
 		return
 	}
 
-	files, err := ioutil.ReadDir(workDir)
+	files, err := ioutil.ReadDir(workPostsPath)
 	for _, s := range files {
 		if s.IsDir() || inIgnoreList(s.Name()) {
 			continue
@@ -653,7 +660,7 @@ func Status() {
 		bExist := false
 		for _, v := range localRepo {
 			if v.FileName == s.Name() {
-				md5, err := pkg.GetFileMd5(getWorkFilePath(s.Name()))
+				md5, err := pkg.GetFileMd5(workPostsPath+s.Name())
 				if err != nil {
 					log.Printf("获取md5异常:%s,文件名:%s", err.Error(), s.Name())
 					continue
@@ -670,7 +677,7 @@ func Status() {
 	}
 
 	for _, v := range localRepo {
-		b, _ := pkg.PathExists(getWorkFilePath(v.FileName))
+		b, _ := pkg.PathExists(workPostsPath+v.FileName)
 		if !b && v.Status != "-2" && v.Status != "-3" {
 			log.Printf("文件被删除:%s", v.FileName)
 		}
@@ -717,8 +724,8 @@ func isSupportImg(ext string) bool {
 }
 
 // replaceImg 替换图片
-func replaceImg(fileName string) error {
-	b, err := ioutil.ReadFile(getWorkFilePath(fileName))
+func replaceImg(filePath string) error {
+	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return errors.New("读取文章异常:" + err.Error())
 	}
@@ -733,18 +740,26 @@ func replaceImg(fileName string) error {
 		return nil
 	}
 
-	data, err := GetCall(ServerHost + "/basic/getPicToken?token=" + UserToken)
-	if err != nil {
-		return errors.New("拉取图片上传token异常:" + err.Error())
-	}
+	// 拉取七牛token
+	var imgToken string
+	if len(c) > 0 {
+		if UserToken == "" {
+			return errors.New("用户token为空,请先初始化")
+		}
 
-	i, ok := data.(map[string]interface{})
-	if !ok {
-		return errors.New(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%v", data))
-	}
-	imgToken := i["token"].(string)
-	if imgToken == "" {
-		return errors.New("拉取图片上传token异常,token为空")
+		data, err := pkg.GetCall(ServerHost + "/basic/getPicToken?token=" + UserToken)
+		if err != nil {
+			return errors.New("拉取图片上传token异常:" + err.Error())
+		}
+
+		i, ok := data.(map[string]interface{})
+		if !ok {
+			return errors.New(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%v", data))
+		}
+		imgToken = i["token"].(string)
+		if imgToken == "" {
+			return errors.New("拉取图片上传token异常,token为空")
+		}
 	}
 
 	for _, v := range c {
@@ -761,19 +776,7 @@ func replaceImg(fileName string) error {
 		}
 
 		qNKey := pkg.GetKey() + ext
-		var localPath string
-		if strings.Contains(imgURL, "http") || strings.Contains(imgURL, "https") {
-			localPath = getImgPath(qNKey)
-			err := pkg.DownLoadFile(imgURL, localPath)
-			if err != nil {
-				log.Printf("下载图片异常:%s,imgURL:%s", err.Error(), imgURL)
-				continue
-			}
-		} else {
-			localPath = imgURL
-		}
-
-		ret, err := qiniu.UploadFile(localPath, qNKey, imgToken)
+		ret, err := qiniu.UploadFile(imgPath+imgURL, qNKey, imgToken)
 		if err != nil {
 			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
 			continue
@@ -784,7 +787,7 @@ func replaceImg(fileName string) error {
 		log.Printf("图片替换成功,原始图片:%s,新图片:%s", imgURL, newImg)
 	}
 
-	err = ioutil.WriteFile(getWorkFilePath(fileName), []byte(content), 0644)
+	err = ioutil.WriteFile(filePath, []byte(content), 0644)
 	if err != nil {
 		return errors.New("写入文章异常:" + err.Error())
 	}
@@ -792,8 +795,8 @@ func replaceImg(fileName string) error {
 }
 
 // getMDTile 获取title
-func getMDTile(fileName string) (string, error) {
-	b, err := ioutil.ReadFile(fileName)
+func getMDTile(filePath string) (string, error) {
+	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return "", err
 	}
@@ -826,66 +829,4 @@ func getMDTile(fileName string) (string, error) {
 		return "", errors.New("title不能为空")
 	}
 	return title, nil
-}
-
-func timeCompare(timeStr1, timeStr2 string) bool {
-	time1, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr1, time.Local)
-	time2, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr2, time.Local)
-	return time1.Unix() > time2.Unix()
-}
-
-// getIndexPath 获取索引的路径 eg:xxx/repo/index
-func getIndexPath() string {
-	return fmt.Sprintf("%s%srepo%sindex", workDir, fileSep, fileSep)
-}
-
-// getRepoFilePath
-func getRepoFilePath(fileName string) string {
-	return fmt.Sprintf("%s%srepo%s%s", workDir, fileSep, fileSep, fileName)
-}
-
-// getWorkFilePath  workDir+"/"+remote.FileName
-func getWorkFilePath(fileName string) string {
-	return fmt.Sprintf("%s%s%s", workDir, fileSep, fileName)
-}
-
-// getImgPath  workDir+"/"+remote.FileName
-func getImgPath(fileName string) string {
-	return fmt.Sprintf("%s%srepo%simg%s%s", workDir, fileSep, fileSep, fileSep, fileName)
-}
-
-func GetCall(url string) (interface{}, error) {
-	ret, err := pkg.HttpGet(url)
-	if err != nil {
-		return "", err
-	}
-
-	r := respData{}
-	err = json.Unmarshal(ret, &r)
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("err:%s,resp:%s", err.Error(), string(ret)))
-	}
-
-	if r.ResponseStatus != "success" {
-		return "", errors.New("errMsg:" + r.Msg)
-	}
-	return r.Data, nil
-}
-
-func PostCall(url string, form url.Values) (interface{}, error) {
-	ret, err := pkg.HttpPost(url, form)
-	if err != nil {
-		return "", err
-	}
-
-	r := respData{}
-	err = json.Unmarshal(ret, &r)
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("err:%s,resp:%s", err.Error(), string(ret)))
-	}
-
-	if r.ResponseStatus != "success" {
-		return "", errors.New("errMsg:" + r.Msg)
-	}
-	return r.Data, nil
 }
