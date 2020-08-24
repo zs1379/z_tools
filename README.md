@@ -40,6 +40,7 @@ title: helloWorld
 
 hello world
 
+支持图片,注意路径
 ![image] (../img/1.png)
 ```
 
@@ -60,7 +61,7 @@ hello world
 1. doc add . 可以添加全部文件导本地仓库
 2. 图片仅支持img目录下的路径, eg:![image] (../img/1.png), add的时候会被替换成七牛地址
 
-#### 6.还原工作区文件
+#### 6.还原工作区文件 
 ```
 ./doc checkout hello.md
 ```
