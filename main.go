@@ -25,7 +25,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.0.4"
+	version    = "0.0.6"
 )
 
 var (
