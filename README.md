@@ -3,7 +3,7 @@
 
 #### 1.安装doc 
 1) sh -c "$(curl -fsSL https://zpic.jiaoliuqu.com/install.sh)"
-2) cd tool
+2) cd ~/docWorkSpace
 
 #### 2.初始化 
 
@@ -29,16 +29,16 @@ title: hello
 ```
 内容是Markdown格式的，前三行自动生成格式不要修改,可以根据需要修改title内容
 
-例如编辑完:
+样例:
 
 ```
 ---
-title: helloWorld
+title: 这是第一篇文章
 ---
 
 hello world
 
-支持图片,注意路径,只支持工作区img目录下的图片
+图片样例 (注意引用路径,只支持工作区img目录下的图片)
 ![image] (../img/1.png)
 ```
 
@@ -57,7 +57,7 @@ hello world
 ```
 注意: 
 1. doc add . 可以添加全部文件导本地仓库
-2. 图片仅支持img目录下的路径, eg:![image] (../img/1.png), add的时候会被替换成七牛地址
+2. 图片add的时候会被替换成七牛地址
 
 #### 6.还原工作区文件 
 ```
