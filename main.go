@@ -78,8 +78,8 @@ func main() {
 			{
 				Name:        "init",
 				Usage:       "初始化环境",
-				Description: "1. doc init test 用来初始化环境的,env(可不填,默认线上)",
-				ArgsUsage:   "[token] [env]",
+				Description: "1. doc init test test为用户的token",
+				ArgsUsage:   "[token]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入token")
@@ -96,7 +96,7 @@ func main() {
 			{
 				Name:        "new",
 				Usage:       "新建文章",
-				Description: "1. doc new test.md 本地自动生成一篇空文档",
+				Description: "1. doc new test.md 本地自动生成一篇test.md的空文档",
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
@@ -111,7 +111,7 @@ func main() {
 			{
 				Name:        "add",
 				Usage:       "提交到本地仓库",
-				Description: "1. doc add test.md 提交test.md到本地仓库\n\r   2. doc add . 全部提交",
+				Description: "1. doc add test.md 提交test.md到本地仓库\n\r   2. doc add . 提交工作区的全部文件到本地仓库",
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
@@ -126,7 +126,7 @@ func main() {
 			{
 				Name:        "pull",
 				Usage:       "拉取文章列表",
-				Description: "1. doc pull 从服务器拉取最新文章列表到本地参考",
+				Description: "1. doc pull 从服务器拉取最新文章列表到本地",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
 					Pull()
@@ -136,7 +136,7 @@ func main() {
 			{
 				Name:        "push",
 				Usage:       "提交到服务器",
-				Description: "1. doc push 本地仓库提交到服务器",
+				Description: "1. doc push 把本地仓库变更提交到服务器",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
 					Push()
@@ -186,7 +186,7 @@ func main() {
 			{
 				Name:        "update",
 				Usage:       "版本升级",
-				Description: "1. doc update 升级工具版本",
+				Description: "1. doc update 升级程序版本",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
 					Update()
@@ -195,7 +195,7 @@ func main() {
 			},
 			{
 				Name:        "setVersion",
-				Usage:       "版本设置-管理员",
+				Usage:       "版本设置-[需管理员]",
 				Description: "1. doc setVersion 0.03 版本设置到0.0.3",
 				ArgsUsage:   "[版本号]",
 				Action: func(c *cli.Context) error {
@@ -209,8 +209,8 @@ func main() {
 			},
 			{
 				Name:        "updateFile",
-				Usage:       "程序上传-管理员",
-				Description: "1. doc updateFile 0.03 0.0.3版本程序员上传到七牛",
+				Usage:       "程序上传-[需管理员]",
+				Description: "1. doc updateFile 0.03 将0.0.3版本程序上传到七牛",
 				ArgsUsage:   "[版本号]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
