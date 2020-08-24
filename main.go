@@ -192,30 +192,16 @@ func main() {
 				},
 			},
 			{
-				Name:        "SetVersion",
-				Usage:       "版本设置-[需管理员]",
-				Description: "1. doc SetVersion 0.0.3 版本设置到0.0.3",
+				Name:        "updateToSer",
+				Usage:       "版本更新到服务器-[需管理员权限]",
+				Description: "1. doc updateToSer 0.0.3 将0.0.3版本程序上传到七牛",
 				ArgsUsage:   "[版本号]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入版本号")
 						return nil
 					}
-					SetVersion(c.Args().Get(0))
-					return nil
-				},
-			},
-			{
-				Name:        "updateFile",
-				Usage:       "程序上传-[需管理员]",
-				Description: "1. doc updateFile 0.0.3 将0.0.3版本程序上传到七牛",
-				ArgsUsage:   "[版本号]",
-				Action: func(c *cli.Context) error {
-					if c.NArg() < 1 {
-						log.Printf("请输入版本号")
-						return nil
-					}
-					UpdateFile(c.Args().Get(0))
+					Update2Ser(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -744,7 +730,7 @@ func Update() {
 
 	// 判断是否需要升级版本
 	if !pkg.VersionCompare(remoteV, version) {
-		log.Printf("已经是最新版本")
+		log.Printf("当前已经是最新版本:%s", version)
 		return
 	}
 
@@ -783,17 +769,6 @@ func Update() {
 	}
 
 	log.Printf("升级版本完成当前版本号:%s", remoteV)
-}
-
-// SetVersion 设置服务器版本号
-func SetVersion(version string) {
-	form := url.Values{"version": {version}}
-	_, err := pkg.ClientCall(ServerHost+"/info/client?action=SetVersion&token="+UserToken, form)
-	if err != nil {
-		log.Printf("版本设置失败:%s", err.Error())
-		return
-	}
-	log.Printf("版本设置成功当前服务器版本号:%s", version)
 }
 
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
@@ -970,8 +945,8 @@ func getRemoteVersion() (string, error) {
 	return v, nil
 }
 
-// UpdateFile 上传程序到七牛
-func UpdateFile(version string) {
+// Update2Ser 更新版本到服务器
+func Update2Ser(version string) {
 	data, err := pkg.ClientCall(ServerHost+"/basic/getPicToken?token="+UserToken, url.Values{})
 	if err != nil {
 		log.Printf("拉取七牛上传token异常:%s", err.Error())
@@ -1005,4 +980,12 @@ func UpdateFile(version string) {
 	}
 
 	log.Printf("程序win版本上传成功,文件:%s", fileNameExe)
+
+	form := url.Values{"version": {version}}
+	_, err = pkg.ClientCall(ServerHost+"/info/client?action=SetVersion&token="+UserToken, form)
+	if err != nil {
+		log.Printf("版本设置失败:%s", err.Error())
+		return
+	}
+	log.Printf("版本设置成功当前服务器版本号:%s", version)
 }
