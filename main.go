@@ -193,6 +193,20 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:        "setVersion",
+				Usage:       "版本设置-管理员",
+				Description: "1. doc setVersion 0.03 版本设置到0.0.3",
+				ArgsUsage:   "[版本号]",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入版本号")
+						return nil
+					}
+					setVersion(c.Args().Get(0))
+					return nil
+				},
+			},
 		},
 	}
 
@@ -725,7 +739,7 @@ func Update() {
 		return
 	}
 
-	log.Printf("检测到新版本,当前版本:%s,远程版本:%s", version, remoteV)
+	log.Printf("检测到新版本,当前版本:%s,远程版本:%s,升级中....", version, remoteV)
 
 	newFile := fmt.Sprintf("doc_%s", version)
 	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", newFile), newFile)
@@ -741,6 +755,16 @@ func Update() {
 	}
 
 	log.Printf("升级版本完成当前版本号:%s", remoteV)
+}
+
+func setVersion(version string) {
+	form := url.Values{"version": {version}}
+	_, err := pkg.PostCall(ServerHost + "/info/client?action=setVersion&token=" + UserToken,form)
+	if err != nil {
+		log.Printf("版本设置失败:%s", err.Error())
+		return
+	}
+	log.Printf("版本设置成功当前服务器版本号:%s", version)
 }
 
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
