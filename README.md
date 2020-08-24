@@ -6,8 +6,9 @@
 ##### 目录结构
 1. doc  mac版程序
 2. doc.exe Windows程序
-3. /repo 本地仓库
-4. ignore 忽略的文件列表 (类似git的.ignore文件)
+3. ./.repo 本地仓库
+4. ./img 图片路径
+4. ./posts 文章路径
 
 #### 2.初始化 
 
@@ -38,6 +39,8 @@ title: helloWorld
 ---
 
 hello world
+
+![image] (../img/1.png)
 ```
 
 #### 4.查看变更
@@ -53,7 +56,9 @@ hello world
 ```
 ./doc add hello.md
 ```
-注意: 如果有图片,会被替换成七牛地址(支持jpeg,gif,png,jpg)
+注意: 
+1. doc add . 可以添加全部文件导本地仓库
+2. 图片仅支持img目录下的路径, eg:![image] (../img/1.png), add的时候会被替换成七牛地址
 
 #### 6.还原工作区文件
 ```
@@ -69,4 +74,9 @@ hello world
 #### 8.拉取远程仓库
 ```
 ./doc pull
+```
+
+#### 9.升级版本
+```
+./doc update
 ```
