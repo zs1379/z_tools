@@ -191,16 +191,16 @@ func main() {
 				},
 			},
 			{
-				Name:        "setVersion",
+				Name:        "SetVersion",
 				Usage:       "版本设置-[需管理员]",
-				Description: "1. doc setVersion 0.0.3 版本设置到0.0.3",
+				Description: "1. doc SetVersion 0.0.3 版本设置到0.0.3",
 				ArgsUsage:   "[版本号]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入版本号")
 						return nil
 					}
-					setVersion(c.Args().Get(0))
+					SetVersion(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -315,7 +315,7 @@ func Pull() {
 		return
 	}
 
-	data, err := pkg.GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
+	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken), url.Values{})
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
@@ -356,7 +356,7 @@ func Pull() {
 		}
 
 		form := url.Values{"filename": {remote.FileName}}
-		retData, err := pkg.PostCall(fmt.Sprintf("%s/info/client?token=%s&action=get", ServerHost, UserToken), form)
+		retData, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?token=%s&action=get", ServerHost, UserToken), form)
 		if err != nil {
 			log.Printf("拉取文章详情异常:%s,文章:%s", err.Error(), remote.FileName)
 			continue
@@ -407,7 +407,7 @@ func Push() {
 		return
 	}
 
-	data, err := pkg.GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
+	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken), url.Values{})
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
@@ -455,7 +455,7 @@ func Push() {
 		if v.Status == "-2" && r.Status != "-2" {
 			form := url.Values{"filename": {v.FileName}}
 			url := fmt.Sprintf("%s/info/client?token=%s&action=delete", ServerHost, UserToken)
-			_, err = pkg.PostCall(url, form)
+			_, err = pkg.ClientCall(url, form)
 			if err != nil {
 				log.Printf("删除远程文章异常:%s,文章:%s", err.Error(), v.FileName)
 			} else {
@@ -479,7 +479,7 @@ func Push() {
 			"title":    {v.Title},
 		}
 		url := fmt.Sprintf("%s/info/client?token=%s&action=add", ServerHost, UserToken)
-		_, err = pkg.PostCall(url, form)
+		_, err = pkg.ClientCall(url, form)
 		if err != nil {
 			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
 			continue
@@ -776,9 +776,10 @@ func Update() {
 	log.Printf("升级版本完成当前版本号:%s", remoteV)
 }
 
-func setVersion(version string) {
+// SetVersion 设置服务器版本号
+func SetVersion(version string) {
 	form := url.Values{"version": {version}}
-	_, err := pkg.PostCall(ServerHost+"/info/client?action=setVersion&token="+UserToken, form)
+	_, err := pkg.ClientCall(ServerHost+"/info/client?action=SetVersion&token="+UserToken, form)
 	if err != nil {
 		log.Printf("版本设置失败:%s", err.Error())
 		return
@@ -849,7 +850,7 @@ func replaceImg(filePath string) error {
 			return errors.New("用户token为空,请先初始化")
 		}
 
-		data, err := pkg.GetCall(ServerHost + "/basic/getPicToken?token=" + UserToken)
+		data, err := pkg.ClientCall(ServerHost+"/basic/getPicToken?token="+UserToken, url.Values{})
 		if err != nil {
 			return errors.New("拉取图片上传token异常:" + err.Error())
 		}
@@ -940,7 +941,7 @@ func getMDTile(filePath string) (string, error) {
 }
 
 func getRemoteVersion() (string, error) {
-	data, err := pkg.GetCall(ServerHost + "/info/client?action=version&token=" + UserToken)
+	data, err := pkg.ClientCall(ServerHost+"/info/client?action=version&token="+UserToken, url.Values{})
 	if err != nil {
 		return "", err
 	}
@@ -962,7 +963,7 @@ func getRemoteVersion() (string, error) {
 
 // UpdateFile 上传程序到七牛
 func UpdateFile(version string) {
-	data, err := pkg.GetCall(ServerHost + "/basic/getPicToken?token=" + UserToken)
+	data, err := pkg.ClientCall(ServerHost+"/basic/getPicToken?token="+UserToken, url.Values{})
 	if err != nil {
 		log.Printf("拉取七牛上传token异常:%s", err.Error())
 		return

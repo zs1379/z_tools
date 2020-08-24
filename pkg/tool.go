@@ -31,6 +31,7 @@ func GetFileMd5(filePath string) (string, error) {
 	return hex.EncodeToString(md5Ctx.Sum(nil)), nil
 }
 
+// CopyFile 拷贝文件
 func CopyFile(dstName, srcName string) (written int64, err error) {
 	src, err := os.Open(srcName)
 	if err != nil {
@@ -45,19 +46,7 @@ func CopyFile(dstName, srcName string) (written int64, err error) {
 	return io.Copy(dst, src)
 }
 
-func HttpGet(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, nil
-}
-
+// HttpPost post请求
 func HttpPost(url string, form url.Values) ([]byte, error) {
 	data := bytes.NewBufferString(form.Encode())
 	rsp, err := http.Post(url, "application/x-www-form-urlencoded", data)
@@ -105,6 +94,7 @@ func GetRandomString(length int) string {
 	return string(result)
 }
 
+// PathExists 判断文件是否存在
 func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -116,6 +106,7 @@ func PathExists(path string) (bool, error) {
 	return false, err
 }
 
+// GetFileSize 获取文件大小
 func GetFileSize(filename string) int64 {
 	var result int64
 	filepath.Walk(filename, func(path string, f os.FileInfo, err error) error {
@@ -144,6 +135,7 @@ func GetKey() string {
 	return GetRandomString(3) + strconv.FormatInt(time.Now().Unix(), 10) + GetRandomString(3)
 }
 
+// TimeCompare 时间戳字符串比较
 func TimeCompare(timeStr1, timeStr2 string) bool {
 	time1, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr1, time.Local)
 	time2, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr2, time.Local)
@@ -157,25 +149,21 @@ type RespData struct {
 	ResponseStatus string      `json:"response_status"`
 }
 
-func GetCall(url string) (interface{}, error) {
-	ret, err := HttpGet(url)
-	if err != nil {
-		return "", err
+// ClientCall http调用
+func ClientCall(url string, form url.Values) (interface{}, error) {
+	var reply interface{}
+	var err error
+	for retryNum := 0; retryNum < 3; retryNum++ {
+		reply, err = postCall(url, form)
+		if err == nil {
+			return reply, nil
+		}
+		time.Sleep(3 * time.Second)
 	}
-
-	r := RespData{}
-	err = json.Unmarshal(ret, &r)
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("err:%s,resp:%s", err.Error(), string(ret)))
-	}
-
-	if r.ResponseStatus != "success" {
-		return "", errors.New("errMsg:" + r.Msg)
-	}
-	return r.Data, nil
+	return nil, err
 }
 
-func PostCall(url string, form url.Values) (interface{}, error) {
+func postCall(url string, form url.Values) (interface{}, error) {
 	ret, err := HttpPost(url, form)
 	if err != nil {
 		return "", err
