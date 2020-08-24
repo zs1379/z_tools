@@ -1,17 +1,15 @@
 # z_tools
 用于协助快速上传文章至z项目
 
-
 #### 1.安装doc 
 1) sh -c "$(curl -fsSL https://zpic.jiaoliuqu.com/install.sh)"
 2) cd tool
 
 ##### 目录结构
-1. doc  mac版程序
-2. doc.exe Windows程序
-3. ./.repo 本地仓库
-4. ./img 图片路径
-4. ./posts 文章路径
+1. doc/doc.exe  程序
+2. ./.repo 本地仓库
+3. ./img 图片引用目录
+4. ./posts 工作区文章目录
 
 #### 2.初始化 
 
@@ -43,7 +41,7 @@ title: helloWorld
 
 hello world
 
-支持图片,注意路径
+支持图片,注意路径,只支持工作区img目录下的图片
 ![image] (../img/1.png)
 ```
 
@@ -69,18 +67,25 @@ hello world
 ./doc checkout hello.md
 ```
 
-#### 7.本地仓库提交到远程
+#### 7.删除文件 
+```
+./doc rm hello.md
+```
+
+#### 8.本地仓库提交到远程
 ```
 ./doc push
 ```
 注意: 如果远程版本比本地版本新，则不会更新远程
 
-#### 8.拉取远程仓库
+#### 9.拉取远程仓库
 ```
 ./doc pull
 ```
 
-#### 9.升级版本
+#### 10.升级版本
 ```
 ./doc update
 ```
+
+### 注意文件名称一旦创建,就不允许修改
