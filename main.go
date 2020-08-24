@@ -11,7 +11,6 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -37,8 +36,8 @@ var (
 	workPostsPath = "./posts/"
 )
 
-// DocDesc 文章描述
-type DocDesc struct {
+// PostDesc 文章描述
+type PostDesc struct {
 	Title      string `json:"title"`       // title
 	FileName   string `json:"file_name"`   // 文件名称
 	UpdateTime string `json:"update_time"` // 文章更新时间
@@ -103,8 +102,7 @@ func main() {
 						log.Printf("请输入文件名")
 						return nil
 					}
-					fileName := c.Args().Get(0)
-					NewDoc(fileName)
+					NewDoc(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -118,8 +116,7 @@ func main() {
 						log.Printf("请输入文件名")
 						return nil
 					}
-					fileName := c.Args().Get(0)
-					Add(fileName)
+					Add(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -196,7 +193,7 @@ func main() {
 			{
 				Name:        "setVersion",
 				Usage:       "版本设置-[需管理员]",
-				Description: "1. doc setVersion 0.03 版本设置到0.0.3",
+				Description: "1. doc setVersion 0.0.3 版本设置到0.0.3",
 				ArgsUsage:   "[版本号]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
@@ -210,7 +207,7 @@ func main() {
 			{
 				Name:        "updateFile",
 				Usage:       "程序上传-[需管理员]",
-				Description: "1. doc updateFile 0.03 将0.0.3版本程序上传到七牛",
+				Description: "1. doc updateFile 0.0.3 将0.0.3版本程序上传到七牛",
 				ArgsUsage:   "[版本号]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
@@ -240,15 +237,15 @@ func main() {
 }
 
 // ReadIndex 读取索引
-func ReadIndex() (map[string]*DocDesc, error) {
-	m := make(map[string]*DocDesc)
+func ReadIndex() (map[string]*PostDesc, error) {
+	m := make(map[string]*PostDesc)
 
 	b, _ := ioutil.ReadFile(indexPath)
 	if len(b) == 0 {
 		return m, nil
 	}
 
-	var list []*DocDesc
+	var list []*PostDesc
 	err := json.Unmarshal(b, &list)
 	if err != nil {
 		return nil, err
@@ -261,8 +258,8 @@ func ReadIndex() (map[string]*DocDesc, error) {
 }
 
 // WriteIndex 写入索引
-func WriteIndex(m map[string]*DocDesc) error {
-	var list []*DocDesc
+func WriteIndex(m map[string]*PostDesc) error {
+	var list []*PostDesc
 	for _, v := range m {
 		list = append(list, v)
 	}
@@ -278,6 +275,7 @@ func WriteIndex(m map[string]*DocDesc) error {
 	return nil
 }
 
+// InitDoc 初始化
 func InitDoc(token string, env string) {
 	err := ioutil.WriteFile(tokenPath, []byte(token), 0644)
 	if err != nil {
@@ -292,11 +290,13 @@ func InitDoc(token string, env string) {
 	log.Printf("初始化成功")
 }
 
+// ReadToken 读取用户token
 func ReadToken() string {
 	b, _ := ioutil.ReadFile(tokenPath)
 	return string(b)
 }
 
+// ReadEnv 读取环境变量
 func ReadEnv() string {
 	b, _ := ioutil.ReadFile(envPath)
 	return string(b)
@@ -309,21 +309,21 @@ func Pull() {
 		return
 	}
 
-	localPosts, err := ReadIndex()
+	localRepoPosts, err := ReadIndex()
 	if err != nil {
-		log.Printf("读取索引异常:%s", err.Error())
+		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
 	}
 
 	data, err := pkg.GetCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken))
 	if err != nil {
-		log.Printf("拉取远程列表异常:%s", err.Error())
+		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
 	}
 
 	remotePosts, _ := data.([]interface{})
 	for _, v := range remotePosts {
-		var remote DocDesc
+		var remote PostDesc
 		m := v.(map[string]interface{})
 		remote.FileName, _ = m["file_name"].(string)
 		remote.Md5, _ = m["file_md5"].(string)
@@ -331,24 +331,24 @@ func Pull() {
 		remote.Status, _ = m["status"].(string)
 
 		if remote.FileName == "" || remote.Md5 == "" || remote.UpdateTime == "" {
-			log.Printf("拉取文章异常,返回字段不全:file:%s,md5:%s,time:%s", remote.FileName, remote.Md5, remote.UpdateTime)
+			log.Printf("拉取文章异常,返回字段不全,file:%s,md5:%s,time:%s", remote.FileName, remote.Md5, remote.UpdateTime)
 			continue
 		}
 
 		// 如果文件远程被删除,则本地也相应删除
 		if remote.Status == "-2" || remote.Status == "-3" {
-			local, ok := localPosts[remote.FileName]
+			local, ok := localRepoPosts[remote.FileName]
 			if ok && local.Status != "-2" && local.Status != "-3" {
 				os.Remove(repoObjPath + local.Md5)
 				os.Remove(local.FileName)
-				log.Printf("文件远程被删除,删除本地文件成功:%s", remote.FileName)
+				log.Printf("文件远程被删除,删除本地文件:%s", remote.FileName)
 			}
-			localPosts[remote.FileName] = &remote
+			localRepoPosts[remote.FileName] = &remote
 			continue
 		}
 
 		// 更新本地repo
-		local, ok := localPosts[remote.FileName]
+		local, ok := localRepoPosts[remote.FileName]
 		if ok {
 			if local.Md5 == remote.Md5 || pkg.TimeCompare(local.UpdateTime, remote.UpdateTime) {
 				continue
@@ -369,7 +369,7 @@ func Pull() {
 		}
 
 		content, _ := data["content"].(string)
-		remote.Title = data["title"].(string)
+		remote.Title, _ = data["title"].(string)
 
 		err = pkg.Write2File([]byte(content), repoObjPath+remote.Md5)
 		if err != nil {
@@ -388,10 +388,10 @@ func Pull() {
 		}
 
 		log.Printf("拉取远程文章成功:%s", remote.FileName)
-		localPosts[remote.FileName] = &remote
+		localRepoPosts[remote.FileName] = &remote
 	}
 
-	WriteIndex(localPosts)
+	WriteIndex(localRepoPosts)
 }
 
 // Push 推到远程服务器
@@ -401,9 +401,9 @@ func Push() {
 		return
 	}
 
-	localList, err := ReadIndex()
+	localRepoPosts, err := ReadIndex()
 	if err != nil {
-		log.Printf("读取索引异常:%s", err.Error())
+		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
 	}
 
@@ -413,38 +413,38 @@ func Push() {
 		return
 	}
 
-	remote := make(map[string]DocDesc)
+	remotePosts := make(map[string]PostDesc)
 	l, _ := data.([]interface{})
 	for _, v := range l {
 		m := v.(map[string]interface{})
-		var a DocDesc
-		a.FileName, _ = m["file_name"].(string)
-		a.Md5, _ = m["file_md5"].(string)
-		a.UpdateTime, _ = m["update_time"].(string)
-		a.Status, _ = m["status"].(string)
+		var p PostDesc
+		p.FileName, _ = m["file_name"].(string)
+		p.Md5, _ = m["file_md5"].(string)
+		p.UpdateTime, _ = m["update_time"].(string)
+		p.Status, _ = m["status"].(string)
 
-		if a.FileName == "" || a.Md5 == "" || a.UpdateTime == "" {
-			log.Printf("拉取文章异常,返回字段不全:file:%s,md5:%s,time:%s", a.FileName, a.Md5, a.UpdateTime)
+		if p.FileName == "" || p.Md5 == "" || p.UpdateTime == "" {
+			log.Printf("拉取文章异常,返回字段不全:file:%s,md5:%s,time:%s", p.FileName, p.Md5, p.UpdateTime)
 			continue
 		}
 
-		remote[a.FileName] = a
+		remotePosts[p.FileName] = p
 
 		// 如果远程文章被删除,则本地也一并删除
-		if a.Status == "-3" || a.Status == "-2" {
-			local, ok := localList[a.FileName]
+		if p.Status == "-3" || p.Status == "-2" {
+			local, ok := localRepoPosts[p.FileName]
 			if ok && local.Status != "-2" && local.Status != "-3" {
 				os.Remove(repoObjPath + local.Md5)
 				os.Remove(local.FileName)
-				log.Printf("文件远程被删除,删除本地文件成功:%s", a.FileName)
+				log.Printf("文件远程被删除,删除本地文件:%s", p.FileName)
 			}
-			localList[a.FileName] = &a
+			localRepoPosts[p.FileName] = &p
 		}
 	}
-	WriteIndex(localList)
+	WriteIndex(localRepoPosts)
 
-	for _, v := range localList {
-		r, ok := remote[v.FileName]
+	for _, v := range localRepoPosts {
+		r, ok := remotePosts[v.FileName]
 		if ok {
 			if (r.Md5 == v.Md5 && r.Status == v.Status) || pkg.TimeCompare(r.UpdateTime, v.UpdateTime) {
 				continue
@@ -485,7 +485,7 @@ func Push() {
 			continue
 		}
 
-		log.Printf("文章推到远程成功:%s", v.FileName)
+		log.Printf("文章推到远程成功文章:%s", v.FileName)
 	}
 }
 
@@ -537,9 +537,9 @@ func Add(fileName string) {
 
 // Rm 删除文件
 func Rm(fileName string) {
-	localPosts, err := ReadIndex()
+	localRepoPosts, err := ReadIndex()
 	if err != nil {
-		log.Printf("读取索引异常:%s", err.Error())
+		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
 	}
 
@@ -549,7 +549,7 @@ func Rm(fileName string) {
 		return
 	}
 
-	local, ok := localPosts[fileName]
+	local, ok := localRepoPosts[fileName]
 	if !ok {
 		log.Printf("本地仓库不存在该文件:%s", fileName)
 		return
@@ -565,17 +565,17 @@ func Rm(fileName string) {
 
 	os.Remove(workPostsPath + fileName)
 	os.Remove(repoObjPath + local.Md5)
-	localPosts[local.FileName] = local
+	localRepoPosts[local.FileName] = local
 
-	WriteIndex(localPosts)
+	WriteIndex(localRepoPosts)
 	return
 }
 
 // Add 文件工作区加入到本地仓库
 func doAdd(fileName string) {
-	localPosts, err := ReadIndex()
+	localRepoPosts, err := ReadIndex()
 	if err != nil {
-		log.Printf("读取索引异常:%s", err.Error())
+		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
 	}
 
@@ -618,55 +618,52 @@ func doAdd(fileName string) {
 		return
 	}
 
-	var repoArticle *DocDesc
-	for _, v := range localPosts {
-		if v.FileName == fileName {
-			if v.Md5 == fileMd5 {
-				log.Printf("内容无变更,文件名:%s", v.FileName)
-				return
-			}
-			repoArticle = v
-		}
+	repoPost, ok := localRepoPosts[fileName]
+	if ok && repoPost.Md5 == fileMd5 {
+		return
 	}
 
 	var uuid string
-	if repoArticle == nil {
-		a := &DocDesc{
+	if repoPost == nil {
+		p := &PostDesc{
 			Title:      title,
 			FileName:   fileName,
 			Md5:        fileMd5,
 			UpdateTime: time.Now().Format("2006-01-02 15:04:05"),
 		}
-		localPosts[uuid] = a
+		localRepoPosts[uuid] = p
 	} else {
 		// 移除旧文件
-		os.Remove(repoObjPath + repoArticle.Md5)
+		os.Remove(repoObjPath + repoPost.Md5)
 
-		repoArticle.Title = title
-		repoArticle.Md5 = fileMd5
-		repoArticle.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
-		localPosts[uuid] = repoArticle
+		repoPost.Title = title
+		repoPost.Md5 = fileMd5
+		repoPost.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
+		localRepoPosts[uuid] = repoPost
 	}
 
 	_, err = pkg.CopyFile(repoObjPath+fileMd5, workPostsPath+fileName)
 	if err != nil {
 		log.Printf("写入索引异常:%s", err.Error())
 	}
-	WriteIndex(localPosts)
+	WriteIndex(localRepoPosts)
 
 	return
 }
 
 // Checkout 从本地repo迁出到工作区
 func Checkout(fileName string) {
-	localRepo, err := ReadIndex()
+	localRepoPosts, err := ReadIndex()
 	if err != nil {
-		log.Printf("读取索引异常:%s", err.Error())
+		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
 	}
 
 	if fileName == "." {
-		for _, v := range localRepo {
+		for _, v := range localRepoPosts {
+			if v.Status == "-2" || v.Status == "-3" {
+				continue
+			}
 			_, err = pkg.CopyFile(workPostsPath+v.FileName, repoObjPath+v.Md5)
 			if err != nil {
 				log.Printf("拷贝文件异常:%s,文件名:%s", err.Error(), v.FileName)
@@ -680,29 +677,29 @@ func Checkout(fileName string) {
 			return
 		}
 
-		exist := false
-		for _, v := range localRepo {
-			if v.FileName == fileName {
-				_, err = pkg.CopyFile(workPostsPath+v.FileName, repoObjPath+v.Md5)
-				if err != nil {
-					log.Printf("拷贝文件异常:%s,文件名:%s", err.Error(), v.FileName)
-					return
-				}
-				exist = true
-				break
-			}
-		}
-		if !exist {
+		v, ok := localRepoPosts[fileName]
+		if !ok {
 			log.Printf("未匹配到任何文件,文件名:%s", fileName)
+			return
+		}
+
+		if v.Status == "-2" || v.Status == "-3" {
+			return
+		}
+
+		_, err = pkg.CopyFile(workPostsPath+v.FileName, repoObjPath+v.Md5)
+		if err != nil {
+			log.Printf("拷贝文件异常:%s,文件名:%s", err.Error(), v.FileName)
+			return
 		}
 	}
 }
 
 // Status 本地工作区和本地repo的差异
 func Status() {
-	localRepo, err := ReadIndex()
+	localRepoPosts, err := ReadIndex()
 	if err != nil {
-		log.Printf("读取索引异常:%s", err.Error())
+		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
 	}
 
@@ -712,26 +709,23 @@ func Status() {
 			continue
 		}
 
-		bExist := false
-		for _, v := range localRepo {
-			if v.FileName == s.Name() {
-				md5, err := pkg.GetFileMd5(workPostsPath + s.Name())
-				if err != nil {
-					log.Printf("获取md5异常:%s,文件名:%s", err.Error(), s.Name())
-					continue
-				}
-				if md5 != v.Md5 {
-					log.Printf("存在变更文件:%s", s.Name())
-				}
-				bExist = true
-			}
-		}
-		if !bExist {
+		v, ok := localRepoPosts[s.Name()]
+		if !ok {
 			log.Printf("存在新文件:%s", s.Name())
+			continue
+		}
+
+		md5, err := pkg.GetFileMd5(workPostsPath + s.Name())
+		if err != nil {
+			log.Printf("获取md5异常:%s,文件名:%s", err.Error(), s.Name())
+			continue
+		}
+		if md5 != v.Md5 {
+			log.Printf("存在变更文件:%s", s.Name())
 		}
 	}
 
-	for _, v := range localRepo {
+	for _, v := range localRepoPosts {
 		b, _ := pkg.PathExists(workPostsPath + v.FileName)
 		if !b && v.Status != "-2" && v.Status != "-3" {
 			log.Printf("文件被删除:%s", v.FileName)
@@ -748,7 +742,7 @@ func Update() {
 	}
 
 	// 判断是否需要升级版本
-	if !versionCompare(remoteV, version) {
+	if !pkg.VersionCompare(remoteV, version) {
 		log.Printf("已经是最新版本")
 		return
 	}
@@ -767,7 +761,7 @@ func Update() {
 		return
 	}
 
-	err = os.Chmod(newFile,0777)
+	err = os.Chmod(newFile, 0777)
 	if err != nil {
 		log.Printf("修改程序权限异常:%s", err.Error())
 		return
@@ -784,7 +778,7 @@ func Update() {
 
 func setVersion(version string) {
 	form := url.Values{"version": {version}}
-	_, err := pkg.PostCall(ServerHost + "/info/client?action=setVersion&token=" + UserToken,form)
+	_, err := pkg.PostCall(ServerHost+"/info/client?action=setVersion&token="+UserToken, form)
 	if err != nil {
 		log.Printf("版本设置失败:%s", err.Error())
 		return
@@ -808,7 +802,7 @@ func checkFilePath(path string) error {
 
 func inIgnoreList(file string) bool {
 	var ignoreList []string
-	b, _ := ioutil.ReadFile("ignore")
+	b, _ := ioutil.ReadFile(".ignore")
 	if len(b) > 0 {
 		ignoreList = strings.Split(string(b), "\n")
 	}
@@ -966,41 +960,31 @@ func getRemoteVersion() (string, error) {
 	return v, nil
 }
 
-func versionCompare(v1, v2 string) bool {
-	v1Arr := strings.Split(v1, ".")
-	v2Arr := strings.Split(v2, ".")
-	for i := 0; i < len(v1Arr); i++ {
-		t1, _ := strconv.Atoi(v1Arr[i])
-		t2, _ := strconv.Atoi(v2Arr[i])
-		if t1 > t2 {
-			return true
-		}
-	}
-	return false
-}
-
+// UpdateFile 上传程序到七牛
 func UpdateFile(version string) {
 	data, err := pkg.GetCall(ServerHost + "/basic/getPicToken?token=" + UserToken)
 	if err != nil {
-		log.Printf("拉取图片上传token异常:%s", err.Error())
+		log.Printf("拉取七牛上传token异常:%s", err.Error())
 		return
 	}
 
 	i, ok := data.(map[string]interface{})
 	if !ok {
-		log.Printf(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%v", data))
+		log.Printf(fmt.Sprintf("拉取七牛上传token异常,返回值格式异常:%v", data))
 		return
 	}
-	imgToken := i["token"].(string)
-	if imgToken == "" {
-		 errors.New("拉取图片上传token异常,token为空")
+	token := i["token"].(string)
+	if token == "" {
+		errors.New("拉取图片上传token异常,token为空")
 		return
 	}
 
-	_, err = qiniu.UploadFile("doc_"+version, "doc_"+version, imgToken)
+	fileName := "doc_" + version
+	_, err = qiniu.UploadFile(fileName, fileName, token)
 	if err != nil {
 		log.Printf("程序上传异常:%s", err.Error())
 		return
 	}
-	log.Print("上传成功")
+
+	log.Printf("上传成功,文件:%s", fileName)
 }

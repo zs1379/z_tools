@@ -225,3 +225,17 @@ func DownLoadFile(URL string, fileName string) error {
 
 	return nil
 }
+
+// VersionCompare 版本比较
+func VersionCompare(v1, v2 string) bool {
+	v1Arr := strings.Split(v1, ".")
+	v2Arr := strings.Split(v2, ".")
+	for i := 0; i < len(v1Arr); i++ {
+		t1, _ := strconv.Atoi(v1Arr[i])
+		t2, _ := strconv.Atoi(v2Arr[i])
+		if t1 > t2 {
+			return true
+		}
+	}
+	return false
+}
