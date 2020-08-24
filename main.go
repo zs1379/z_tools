@@ -25,7 +25,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.0.6"
+	version    = "0.0.10"
 )
 
 var (
@@ -985,23 +985,24 @@ func UpdateFile(version string) {
 	}
 	token := i["token"].(string)
 	if token == "" {
-		errors.New("拉取图片上传token异常,token为空")
+		log.Printf("拉取图片上传token异常,token为空")
 		return
 	}
 
 	fileNameMac := "doc_" + version
-	_, err = qiniu.UploadFile(fileNameMac, fileNameMac, token)
+	_, err = qiniu.UploadFile("doc", fileNameMac, token)
 	if err != nil {
 		log.Printf("程序mac版本上传异常:%s", err.Error())
 		return
 	}
+	log.Printf("程序mac版本上传成功,文件:%s", fileNameMac)
 
 	fileNameExe := "doc_" + version + ".exe"
-	_, err = qiniu.UploadFile(fileNameExe, fileNameExe, token)
+	_, err = qiniu.UploadFile("doc.exe", fileNameExe, token)
 	if err != nil {
 		log.Printf("程序win版本上传异常:%s", err.Error())
 		return
 	}
 
-	log.Printf("上传成功,文件:%s", fileNameMac)
+	log.Printf("程序win版本上传成功,文件:%s", fileNameExe)
 }
