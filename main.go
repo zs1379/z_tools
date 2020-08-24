@@ -151,14 +151,13 @@ func main() {
 						log.Printf("请输入文件名")
 						return nil
 					}
-					fileName := c.Args().Get(0)
-					Rm(fileName)
+					Rm(c.Args().Get(0))
 					return nil
 				},
 			},
 			{
 				Name:        "status",
-				Usage:       "文件变更",
+				Usage:       "查看文件变更",
 				Description: "1. doc status 比对本地仓库和工作区的文件变更",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
@@ -176,8 +175,7 @@ func main() {
 						log.Printf("请输入文件名")
 						return nil
 					}
-					fileName := c.Args().Get(0)
-					Checkout(fileName)
+					Checkout(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -260,6 +258,9 @@ func WriteIndex(m map[string]*PostDesc) error {
 	for _, v := range m {
 		list = append(list, v)
 	}
+	if len(list) == 0 {
+		return nil
+	}
 
 	b, err := json.Marshal(list)
 	if err != nil {
@@ -321,7 +322,12 @@ func Pull() {
 	remotePosts, _ := data.([]interface{})
 	for _, v := range remotePosts {
 		var remote PostDesc
-		m := v.(map[string]interface{})
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			log.Printf("拉取文章异常,返回字段格式不对:%v", v)
+			continue
+		}
+
 		remote.FileName, _ = m["file_name"].(string)
 		remote.Md5, _ = m["file_md5"].(string)
 		remote.UpdateTime, _ = m["update_time"].(string)
@@ -781,6 +787,58 @@ func Update() {
 	log.Printf("升级版本完成当前版本号:%s", remoteV)
 }
 
+// Update2Ser 更新版本到服务器
+func Update2Ser(version string) {
+	token, err := getUploadToken("")
+	if err != nil {
+		log.Printf("拉取七牛上传token异常:%s", err.Error())
+		return
+	}
+
+	fileNameMac := "doc_" + version
+	_, err = qiniu.UploadFile("doc", fileNameMac, token)
+	if err != nil {
+		log.Printf("程序mac版本上传异常:%s", err.Error())
+		return
+	}
+	log.Printf("程序mac版本上传成功,文件:%s", fileNameMac)
+
+	fileNameExe := "doc_" + version + ".exe"
+	_, err = qiniu.UploadFile("doc.exe", fileNameExe, token)
+	if err != nil {
+		log.Printf("程序win版本上传异常:%s", err.Error())
+		return
+	}
+	log.Printf("程序win版本上传成功,文件:%s", fileNameExe)
+
+	form := url.Values{"version": {version}}
+	_, err = pkg.ClientCall(ServerHost+"/info/client?action=SetVersion&token="+UserToken, form)
+	if err != nil {
+		log.Printf("版本设置失败:%s", err.Error())
+		return
+	}
+
+	log.Printf("版本设置成功当前服务器版本号:%s", version)
+}
+
+// UpdateInstallShell 更新安装脚本
+func UpdateInstallShell() {
+	installMac := "install.sh"
+
+	token, err := getUploadToken(installMac)
+	if err != nil {
+		log.Printf("拉取七牛上传token异常:%s", err.Error())
+		return
+	}
+
+	_, err = qiniu.UploadFile(installMac, installMac, token)
+	if err != nil {
+		log.Printf("上传安装脚本异常err:%s", err.Error())
+		return
+	}
+	log.Println("安装脚本更新成功")
+}
+
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
 func checkFilePath(path string) error {
 	if strings.Contains(path, " ") {
@@ -820,7 +878,7 @@ func isSupportImg(ext string) bool {
 	return false
 }
 
-// replaceImg 替换图片
+// replaceImg 本地图片替换成七牛图片
 func replaceImg(filePath string) error {
 	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -837,49 +895,34 @@ func replaceImg(filePath string) error {
 		return nil
 	}
 
-	// 拉取七牛token
 	var imgToken string
-	if len(c) > 0 {
-		if UserToken == "" {
-			return errors.New("用户token为空,请先初始化")
-		}
-
-		data, err := pkg.ClientCall(ServerHost+"/basic/getPicToken?token="+UserToken, url.Values{})
-		if err != nil {
-			return errors.New("拉取图片上传token异常:" + err.Error())
-		}
-
-		i, ok := data.(map[string]interface{})
-		if !ok {
-			return errors.New(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%v", data))
-		}
-		imgToken = i["token"].(string)
-		if imgToken == "" {
-			return errors.New("拉取图片上传token异常,token为空")
-		}
+	imgToken, err = getUploadToken("")
+	if err != nil {
+		return errors.New("拉取七牛上传token异常:" + err.Error())
 	}
 
 	for _, v := range c {
 		if len(v) < 2 {
 			continue
 		}
+
 		imgURL := string(v[1])
 		ext := pkg.GetExt(imgURL)
 		if !isSupportImg(ext) {
 			log.Printf("该图片格式不支持%s", ext)
 			continue
 		}
+
 		if strings.Contains(imgURL, "jiaoliuqu.com") {
 			continue
 		}
 
 		if !strings.HasPrefix(imgURL, "../img/") && strings.HasPrefix(imgURL, `..\img\`) {
-			log.Printf("该图片路径非法%s,格式为../img/xx", imgURL)
+			log.Printf("该图片路径非法%s,正确格式为../img/xx", imgURL)
 			continue
 		}
 
-		qNKey := pkg.GetKey() + ext
-		ret, err := qiniu.UploadFile(imgURL[1:], qNKey, imgToken)
+		ret, err := qiniu.UploadFile(imgURL[1:], pkg.GetKey() + ext, imgToken)
 		if err != nil {
 			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
 			continue
@@ -934,6 +977,7 @@ func getMDTile(filePath string) (string, error) {
 	return title, nil
 }
 
+// getRemoteVersion 获取服务器版本号
 func getRemoteVersion() (string, error) {
 	data, err := pkg.ClientCall(ServerHost+"/info/client?action=version&token="+UserToken, url.Values{})
 	if err != nil {
@@ -944,10 +988,11 @@ func getRemoteVersion() (string, error) {
 		return "", errors.New(fmt.Sprintf("获取版本返回值格式异常:%v", data))
 	}
 
-	v := i["version"].(string)
+	v, _ := i["version"].(string)
 	if v == "" {
-		return "", errors.New("拉取版本异常,token为空")
+		return "", fmt.Errorf("拉取版本异常,token为空,后端返回内容:%v",data)
 	}
+
 	arr := strings.Split(v, ".")
 	if len(arr) != 3 {
 		return "", errors.New("拉取版本异常,格式错误" + v)
@@ -955,74 +1000,29 @@ func getRemoteVersion() (string, error) {
 	return v, nil
 }
 
-// Update2Ser 更新版本到服务器
-func Update2Ser(version string) {
-	data, err := pkg.ClientCall(ServerHost+"/basic/getPicToken?token="+UserToken, url.Values{})
+// getUploadToken 获取七牛token
+func getUploadToken(key string) (string, error) {
+	if UserToken == "" {
+		return "", errors.New("用户token为空,请先初始化")
+	}
+
+	u := ServerHost + "/basic/getPicToken?token=" + UserToken
+	if key != "" {
+		u += "&key=" + key
+	}
+	data, err := pkg.ClientCall(u, url.Values{})
 	if err != nil {
-		log.Printf("拉取七牛上传token异常:%s", err.Error())
-		return
+		return "", err
 	}
 
 	i, ok := data.(map[string]interface{})
 	if !ok {
-		log.Printf(fmt.Sprintf("拉取七牛上传token异常,返回值格式异常:%v", data))
-		return
+		return "", fmt.Errorf("获取token返回值格式异常%v",data)
 	}
+
 	token := i["token"].(string)
 	if token == "" {
-		log.Printf("拉取图片上传token异常,token为空")
-		return
+		return "", fmt.Errorf("获取失败,token为空,返回内容:%v",data)
 	}
-
-	fileNameMac := "doc_" + version
-	_, err = qiniu.UploadFile("doc", fileNameMac, token)
-	if err != nil {
-		log.Printf("程序mac版本上传异常:%s", err.Error())
-		return
-	}
-	log.Printf("程序mac版本上传成功,文件:%s", fileNameMac)
-
-	fileNameExe := "doc_" + version + ".exe"
-	_, err = qiniu.UploadFile("doc.exe", fileNameExe, token)
-	if err != nil {
-		log.Printf("程序win版本上传异常:%s", err.Error())
-		return
-	}
-
-	log.Printf("程序win版本上传成功,文件:%s", fileNameExe)
-
-	form := url.Values{"version": {version}}
-	_, err = pkg.ClientCall(ServerHost+"/info/client?action=SetVersion&token="+UserToken, form)
-	if err != nil {
-		log.Printf("版本设置失败:%s", err.Error())
-		return
-	}
-
-	log.Printf("版本设置成功当前服务器版本号:%s", version)
-}
-
-func UpdateInstallShell() {
-	data, err := pkg.ClientCall(ServerHost+"/basic/getPicToken?token="+UserToken, url.Values{})
-	if err != nil {
-		log.Printf("拉取七牛上传token异常:%s", err.Error())
-		return
-	}
-
-	i, ok := data.(map[string]interface{})
-	if !ok {
-		log.Printf(fmt.Sprintf("拉取七牛上传token异常,返回值格式异常:%v", data))
-		return
-	}
-	token := i["token"].(string)
-	if token == "" {
-		log.Printf("拉取图片上传token异常,token为空")
-		return
-	}
-	installMac := "install.sh"
-	_, err = qiniu.UploadFile(installMac, installMac, token)
-	if err != nil {
-		log.Printf("上传安装脚本异常err:%s", err.Error())
-		return
-	}
-	log.Println("安装脚本更新成功")
+	return token, nil
 }
