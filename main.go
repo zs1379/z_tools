@@ -205,6 +205,16 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:        "updateInstall",
+				Usage:       "更新install文件-[需管理员权限]",
+				Description: "1. doc updateInstall",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					UpdateInstallShell()
+					return nil
+				},
+			},
 		},
 	}
 
@@ -988,12 +998,31 @@ func Update2Ser(version string) {
 		return
 	}
 
-	installMac := "install_mac.sh"
-	_, err = qiniu.UploadFile(installMac, installMac, token)
+	log.Printf("版本设置成功当前服务器版本号:%s", version)
+}
+
+func UpdateInstallShell() {
+	data, err := pkg.ClientCall(ServerHost+"/basic/getPicToken?token="+UserToken, url.Values{})
 	if err != nil {
-		log.Printf("程序win版本上传异常:%s", err.Error())
+		log.Printf("拉取七牛上传token异常:%s", err.Error())
 		return
 	}
 
-	log.Printf("版本设置成功当前服务器版本号:%s", version)
+	i, ok := data.(map[string]interface{})
+	if !ok {
+		log.Printf(fmt.Sprintf("拉取七牛上传token异常,返回值格式异常:%v", data))
+		return
+	}
+	token := i["token"].(string)
+	if token == "" {
+		log.Printf("拉取图片上传token异常,token为空")
+		return
+	}
+	installMac := "install.sh"
+	_, err = qiniu.UploadFile(installMac, installMac, token)
+	if err != nil {
+		log.Printf("上传安装脚本异常err:%s", err.Error())
+		return
+	}
+	log.Println("安装脚本更新成功")
 }
