@@ -444,13 +444,13 @@ func Push() {
 
 		content := string(b)
 		form := url.Values{
-			"file_name": {v.FileName},
-			"token":     {UserToken},
-			"md5":       {v.Md5},
-			"content":   {content},
-			"title":     {v.Title},
+			"filename": {v.FileName},
+			"token":    {UserToken},
+			"md5":      {v.Md5},
+			"content":  {content},
+			"title":    {v.Title},
 		}
-		url := fmt.Sprintf("%s/info/client?token=%s&action=add&filename=%s", ServerHost, UserToken, v.FileName)
+		url := fmt.Sprintf("%s/info/client?token=%s&action=add", ServerHost, UserToken)
 		_, err = pkg.PostCall(url, form)
 		if err != nil {
 			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
@@ -725,22 +725,22 @@ func Update() {
 		return
 	}
 
-	log.Printf("检测到新版本,当前版本:%s,远程版本:%s",version,remoteV)
+	log.Printf("检测到新版本,当前版本:%s,远程版本:%s", version, remoteV)
 
-	newFile := fmt.Sprintf("doc_%s",version)
-	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.jiaoliuqu.com/%s",newFile),newFile)
+	newFile := fmt.Sprintf("doc_%s", version)
+	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", newFile), newFile)
 	if err != nil {
 		log.Printf("获取新版本文件异常:%s", err.Error())
 		return
 	}
 
-	err = os.Rename(newFile,"doc")
+	err = os.Rename(newFile, "doc")
 	if err != nil {
 		log.Printf("版本覆盖失败:%s", err.Error())
 		return
 	}
 
-	log.Printf("升级版本完成当前版本号:%s",remoteV)
+	log.Printf("升级版本完成当前版本号:%s", remoteV)
 }
 
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
@@ -828,15 +828,15 @@ func replaceImg(filePath string) error {
 		imgURL := string(v[1])
 		ext := pkg.GetExt(imgURL)
 		if !isSupportImg(ext) {
-			log.Printf("该图片格式不支持%s",ext)
+			log.Printf("该图片格式不支持%s", ext)
 			continue
 		}
 		if strings.Contains(imgURL, "jiaoliuqu.com") {
 			continue
 		}
 
-		if !strings.HasPrefix(imgURL,"../img/") && strings.HasPrefix(imgURL,`..\img\`) {
-			log.Printf("该图片路径非法%s,格式为../img/xx",imgURL)
+		if !strings.HasPrefix(imgURL, "../img/") && strings.HasPrefix(imgURL, `..\img\`) {
+			log.Printf("该图片路径非法%s,格式为../img/xx", imgURL)
 			continue
 		}
 
@@ -899,7 +899,7 @@ func getMDTile(filePath string) (string, error) {
 func getRemoteVersion() (string, error) {
 	data, err := pkg.GetCall(ServerHost + "/info/client?action=version&token=" + UserToken)
 	if err != nil {
-		return "",err
+		return "", err
 	}
 	i, ok := data.(map[string]interface{})
 	if !ok {
