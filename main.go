@@ -25,7 +25,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.0.1"
+	version    = "0.0.4"
 )
 
 var (
@@ -204,6 +204,20 @@ func main() {
 						return nil
 					}
 					setVersion(c.Args().Get(0))
+					return nil
+				},
+			},
+			{
+				Name:        "updateFile",
+				Usage:       "程序上传-管理员",
+				Description: "1. doc updateFile 0.03 0.0.3版本程序员上传到七牛",
+				ArgsUsage:   "[版本号]",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入版本号")
+						return nil
+					}
+					UpdateFile(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -741,10 +755,21 @@ func Update() {
 
 	log.Printf("检测到新版本,当前版本:%s,远程版本:%s,升级中....", version, remoteV)
 
-	newFile := fmt.Sprintf("doc_%s", version)
+	newFile := fmt.Sprintf("doc_%s", remoteV)
 	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", newFile), newFile)
 	if err != nil {
 		log.Printf("获取新版本文件异常:%s", err.Error())
+		return
+	}
+
+	if pkg.GetFileSize(newFile) <= 2048 {
+		log.Printf("程序文件大小异常")
+		return
+	}
+
+	err = os.Chmod(newFile,0777)
+	if err != nil {
+		log.Printf("修改程序权限异常:%s", err.Error())
 		return
 	}
 
@@ -952,4 +977,30 @@ func versionCompare(v1, v2 string) bool {
 		}
 	}
 	return false
+}
+
+func UpdateFile(version string) {
+	data, err := pkg.GetCall(ServerHost + "/basic/getPicToken?token=" + UserToken)
+	if err != nil {
+		log.Printf("拉取图片上传token异常:%s", err.Error())
+		return
+	}
+
+	i, ok := data.(map[string]interface{})
+	if !ok {
+		log.Printf(fmt.Sprintf("拉取图片上传token异常,返回值格式异常:%v", data))
+		return
+	}
+	imgToken := i["token"].(string)
+	if imgToken == "" {
+		 errors.New("拉取图片上传token异常,token为空")
+		return
+	}
+
+	_, err = qiniu.UploadFile("doc_"+version, "doc_"+version, imgToken)
+	if err != nil {
+		log.Printf("程序上传异常:%s", err.Error())
+		return
+	}
+	log.Print("上传成功")
 }
