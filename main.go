@@ -96,7 +96,7 @@ func main() {
 			{
 				Name:        "new",
 				Usage:       "新建文章",
-				Description: "1. doc new 测试文档.md 本地自动生成一篇空文档",
+				Description: "1. doc new test.md 本地自动生成一篇空文档",
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
@@ -146,7 +146,7 @@ func main() {
 			{
 				Name:        "rm",
 				Usage:       "删除文件",
-				Description: "1. doc rm 测试文档.md",
+				Description: "1. doc rm test.md 把test.md从本地仓库移除",
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
@@ -171,7 +171,7 @@ func main() {
 			{
 				Name:        "checkout",
 				Usage:       "恢复本地仓库的指定文件到工作区",
-				Description: "1. doc checkout 测试文档.md 恢复本地仓库的指定文件到工作区\n\r   2. doc checkout . 恢复本地仓库的全部文件到工作区",
+				Description: "1. doc checkout test.md 从本地仓库恢复test.md到工作区\n\r   2. doc checkout . 恢复本地仓库的全部文件到工作区",
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
