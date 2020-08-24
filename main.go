@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -749,7 +750,15 @@ func Update() {
 
 	log.Printf("检测到新版本,当前版本:%s,远程版本:%s,升级中....", version, remoteV)
 
+	oldFile := "doc"
 	newFile := fmt.Sprintf("doc_%s", remoteV)
+
+	sysType := runtime.GOOS
+	if sysType == "windows" {
+		oldFile += ".exe"
+		newFile += ".exe"
+	}
+
 	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", newFile), newFile)
 	if err != nil {
 		log.Printf("获取新版本文件异常:%s", err.Error())
@@ -757,7 +766,7 @@ func Update() {
 	}
 
 	if pkg.GetFileSize(newFile) <= 2048 {
-		log.Printf("程序文件大小异常")
+		log.Printf("新版本程序文件大小异常,停止更新")
 		return
 	}
 
@@ -767,7 +776,7 @@ func Update() {
 		return
 	}
 
-	err = os.Rename(newFile, "doc")
+	err = os.Rename(newFile, oldFile)
 	if err != nil {
 		log.Printf("版本覆盖失败:%s", err.Error())
 		return
@@ -980,12 +989,19 @@ func UpdateFile(version string) {
 		return
 	}
 
-	fileName := "doc_" + version
-	_, err = qiniu.UploadFile(fileName, fileName, token)
+	fileNameMac := "doc_" + version
+	_, err = qiniu.UploadFile(fileNameMac, fileNameMac, token)
 	if err != nil {
-		log.Printf("程序上传异常:%s", err.Error())
+		log.Printf("程序mac版本上传异常:%s", err.Error())
 		return
 	}
 
-	log.Printf("上传成功,文件:%s", fileName)
+	fileNameExe := "doc_" + version + ".exe"
+	_, err = qiniu.UploadFile(fileNameExe, fileNameExe, token)
+	if err != nil {
+		log.Printf("程序win版本上传异常:%s", err.Error())
+		return
+	}
+
+	log.Printf("上传成功,文件:%s", fileNameMac)
 }
