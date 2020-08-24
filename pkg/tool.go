@@ -3,6 +3,7 @@ package pkg
 import (
 	"bytes"
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -190,4 +191,37 @@ func PostCall(url string, form url.Values) (interface{}, error) {
 		return "", errors.New("errMsg:" + r.Msg)
 	}
 	return r.Data, nil
+}
+
+// DownLoadFile 下载文件
+func DownLoadFile(URL string, fileName string) error {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{Transport: tr}
+	headers := make(http.Header)
+	req, err := http.NewRequest("GET", URL, nil)
+	if err != nil {
+		return err
+	}
+	headers.Set("Accept-Encoding", "gzip, deflate")
+	req.Header = headers
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(fileName, body, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,8 +76,10 @@ func main() {
 		Usage:   "文章上传助手",
 		Commands: []*cli.Command{
 			{
-				Name:  "init",
-				Usage: "初始化token",
+				Name:        "init",
+				Usage:       "初始化环境",
+				Description: "1. doc init test 用来初始化环境的,env(可不填,默认线上)",
+				ArgsUsage:   "[token] [env]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入token")
@@ -91,8 +94,10 @@ func main() {
 				},
 			},
 			{
-				Name:  "new",
-				Usage: "新建文章",
+				Name:        "new",
+				Usage:       "新建文章",
+				Description: "1. doc new 测试文档.md 本地自动生成一篇空文档",
+				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入文件名")
@@ -104,8 +109,10 @@ func main() {
 				},
 			},
 			{
-				Name:  "add",
-				Usage: "工作区文章新增/变更提交到本地仓库 ",
+				Name:        "add",
+				Usage:       "提交到本地仓库",
+				Description: "1. doc add test.md 提交test.md到本地仓库\n\r   2. doc add . 全部提交",
+				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入文件名")
@@ -117,45 +124,55 @@ func main() {
 				},
 			},
 			{
-				Name:  "pull",
-				Usage: "服务器拉取最新文章列表",
+				Name:        "pull",
+				Usage:       "拉取文章列表",
+				Description: "1. doc pull 从服务器拉取最新文章列表到本地参考",
+				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
 					Pull()
 					return nil
 				},
 			},
 			{
-				Name:  "push",
-				Usage: "本地仓库提交到服务器",
+				Name:        "push",
+				Usage:       "提交到服务器",
+				Description: "1. doc push 本地仓库提交到服务器",
+				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
 					Push()
 					return nil
 				},
 			},
 			{
-				Name:  "rm",
-				Usage: "删除本地文件",
+				Name:        "rm",
+				Usage:       "删除文件",
+				Description: "1. doc rm 测试文档.md",
+				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入文件名")
 						return nil
 					}
 					fileName := c.Args().Get(0)
-					Rm(workPostsPath+fileName)
+					Rm(fileName)
 					return nil
 				},
 			},
 			{
-				Name:  "status",
-				Usage: "比对本地仓库和工作区的文件变更",
+				Name:        "status",
+				Usage:       "文件变更",
+				Description: "1. doc status 比对本地仓库和工作区的文件变更",
+				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
 					Status()
 					return nil
 				},
 			},
 			{
-				Name:  "checkout",
-				Usage: "恢复本地仓库的指定文件到工作区 参数:文件名",
+				Name:        "checkout",
+				Usage:       "恢复本地仓库的指定文件到工作区",
+				Description: "1. doc checkout 测试文档.md 恢复本地仓库的指定文件到工作区\n\r   2. doc checkout . 恢复本地仓库的全部文件到工作区",
+				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入文件名")
@@ -163,6 +180,16 @@ func main() {
 					}
 					fileName := c.Args().Get(0)
 					Checkout(fileName)
+					return nil
+				},
+			},
+			{
+				Name:        "update",
+				Usage:       "版本升级",
+				Description: "1. doc update 升级工具版本",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					Update()
 					return nil
 				},
 			},
@@ -284,7 +311,7 @@ func Pull() {
 		if remote.Status == "-2" || remote.Status == "-3" {
 			local, ok := localPosts[remote.FileName]
 			if ok && local.Status != "-2" && local.Status != "-3" {
-				os.Remove(repoObjPath+local.Md5)
+				os.Remove(repoObjPath + local.Md5)
 				os.Remove(local.FileName)
 				log.Printf("文件远程被删除,删除本地文件成功:%s", remote.FileName)
 			}
@@ -329,7 +356,7 @@ func Pull() {
 		}
 
 		if local != nil {
-			os.Remove(repoObjPath+local.Md5)
+			os.Remove(repoObjPath + local.Md5)
 		}
 
 		log.Printf("拉取远程文章成功:%s", remote.FileName)
@@ -379,7 +406,7 @@ func Push() {
 		if a.Status == "-3" || a.Status == "-2" {
 			local, ok := localList[a.FileName]
 			if ok && local.Status != "-2" && local.Status != "-3" {
-				os.Remove(repoObjPath+local.Md5)
+				os.Remove(repoObjPath + local.Md5)
 				os.Remove(local.FileName)
 				log.Printf("文件远程被删除,删除本地文件成功:%s", a.FileName)
 			}
@@ -409,7 +436,7 @@ func Push() {
 			continue
 		}
 
-		b, err := ioutil.ReadFile(repoObjPath+v.Md5)
+		b, err := ioutil.ReadFile(repoObjPath + v.Md5)
 		if err != nil {
 			log.Printf("读取文章异常:%s,文章:%s", err.Error(), v.FileName)
 			continue
@@ -442,7 +469,7 @@ func NewDoc(fileName string) {
 		return
 	}
 
-	exist, _ := pkg.PathExists(workPostsPath+fileName)
+	exist, _ := pkg.PathExists(workPostsPath + fileName)
 	if exist {
 		log.Printf("文件已经存在,文件:%s", fileName)
 		return
@@ -508,8 +535,8 @@ func Rm(fileName string) {
 	local.Status = "-2"
 	local.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
 
-	os.Remove(workPostsPath+fileName)
-	os.Remove(repoObjPath+local.Md5)
+	os.Remove(workPostsPath + fileName)
+	os.Remove(repoObjPath + local.Md5)
 	localPosts[local.FileName] = local
 
 	WriteIndex(localPosts)
@@ -530,7 +557,7 @@ func doAdd(fileName string) {
 		return
 	}
 
-	exist, err := pkg.PathExists(workPostsPath+fileName)
+	exist, err := pkg.PathExists(workPostsPath + fileName)
 	if err != nil {
 		log.Printf("判断文件是否存在异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
@@ -545,19 +572,19 @@ func doAdd(fileName string) {
 		return
 	}
 
-	err = replaceImg(workPostsPath+fileName)
+	err = replaceImg(workPostsPath + fileName)
 	if err != nil {
 		log.Printf("图片替换异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
 	}
 
-	fileMd5, err := pkg.GetFileMd5(workPostsPath+fileName)
+	fileMd5, err := pkg.GetFileMd5(workPostsPath + fileName)
 	if err != nil {
 		log.Printf("获取文件md5异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
 	}
 
-	title, err := getMDTile(workPostsPath+fileName)
+	title, err := getMDTile(workPostsPath + fileName)
 	if err != nil {
 		log.Printf("获取文件title异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
@@ -585,7 +612,7 @@ func doAdd(fileName string) {
 		localPosts[uuid] = a
 	} else {
 		// 移除旧文件
-		os.Remove(repoObjPath+repoArticle.Md5)
+		os.Remove(repoObjPath + repoArticle.Md5)
 
 		repoArticle.Title = title
 		repoArticle.Md5 = fileMd5
@@ -660,7 +687,7 @@ func Status() {
 		bExist := false
 		for _, v := range localRepo {
 			if v.FileName == s.Name() {
-				md5, err := pkg.GetFileMd5(workPostsPath+s.Name())
+				md5, err := pkg.GetFileMd5(workPostsPath + s.Name())
 				if err != nil {
 					log.Printf("获取md5异常:%s,文件名:%s", err.Error(), s.Name())
 					continue
@@ -677,11 +704,43 @@ func Status() {
 	}
 
 	for _, v := range localRepo {
-		b, _ := pkg.PathExists(workPostsPath+v.FileName)
+		b, _ := pkg.PathExists(workPostsPath + v.FileName)
 		if !b && v.Status != "-2" && v.Status != "-3" {
 			log.Printf("文件被删除:%s", v.FileName)
 		}
 	}
+}
+
+// Update 版本升级
+func Update() {
+	remoteV, err := getRemoteVersion()
+	if err != nil {
+		log.Printf("获取版本号异常:%s", err.Error())
+		return
+	}
+
+	// 判断是否需要升级版本
+	if !versionCompare(remoteV, version) {
+		log.Printf("已经是最新版本")
+		return
+	}
+
+	log.Printf("检测到新版本,当前版本:%s,远程版本:%s",version,remoteV)
+
+	newFile := fmt.Sprintf("doc_%s",version)
+	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.jiaoliuqu.com/%s",newFile),newFile)
+	if err != nil {
+		log.Printf("获取新版本文件异常:%s", err.Error())
+		return
+	}
+
+	err = os.Rename(newFile,"doc")
+	if err != nil {
+		log.Printf("版本覆盖失败:%s", err.Error())
+		return
+	}
+
+	log.Printf("升级版本完成当前版本号:%s",remoteV)
 }
 
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
@@ -769,14 +828,20 @@ func replaceImg(filePath string) error {
 		imgURL := string(v[1])
 		ext := pkg.GetExt(imgURL)
 		if !isSupportImg(ext) {
+			log.Printf("该图片格式不支持%s",ext)
 			continue
 		}
 		if strings.Contains(imgURL, "jiaoliuqu.com") {
 			continue
 		}
 
+		if !strings.HasPrefix(imgURL,"../img/") && strings.HasPrefix(imgURL,`..\img\`) {
+			log.Printf("该图片路径非法%s,格式为../img/xx",imgURL)
+			continue
+		}
+
 		qNKey := pkg.GetKey() + ext
-		ret, err := qiniu.UploadFile(imgPath+imgURL, qNKey, imgToken)
+		ret, err := qiniu.UploadFile(imgURL[1:], qNKey, imgToken)
 		if err != nil {
 			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
 			continue
@@ -829,4 +894,38 @@ func getMDTile(filePath string) (string, error) {
 		return "", errors.New("title不能为空")
 	}
 	return title, nil
+}
+
+func getRemoteVersion() (string, error) {
+	data, err := pkg.GetCall(ServerHost + "/info/client?action=version&token=" + UserToken)
+	if err != nil {
+		return "",err
+	}
+	i, ok := data.(map[string]interface{})
+	if !ok {
+		return "", errors.New(fmt.Sprintf("获取版本返回值格式异常:%v", data))
+	}
+
+	v := i["version"].(string)
+	if v == "" {
+		return "", errors.New("拉取版本异常,token为空")
+	}
+	arr := strings.Split(v, ".")
+	if len(arr) != 3 {
+		return "", errors.New("拉取版本异常,格式错误" + v)
+	}
+	return v, nil
+}
+
+func versionCompare(v1, v2 string) bool {
+	v1Arr := strings.Split(v1, ".")
+	v2Arr := strings.Split(v2, ".")
+	for i := 0; i < len(v1Arr); i++ {
+		t1, _ := strconv.Atoi(v1Arr[i])
+		t2, _ := strconv.Atoi(v2Arr[i])
+		if t1 > t2 {
+			return true
+		}
+	}
+	return false
 }
