@@ -25,7 +25,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.0.10"
+	version    = "0.0.11"
 )
 
 var (
@@ -987,5 +987,13 @@ func Update2Ser(version string) {
 		log.Printf("版本设置失败:%s", err.Error())
 		return
 	}
+
+	installMac := "install_mac.sh"
+	_, err = qiniu.UploadFile(installMac, installMac, token)
+	if err != nil {
+		log.Printf("程序win版本上传异常:%s", err.Error())
+		return
+	}
+
 	log.Printf("版本设置成功当前服务器版本号:%s", version)
 }
