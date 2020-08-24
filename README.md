@@ -2,7 +2,10 @@
 用于协助快速上传文章至z项目
 
 
-#### 1.下载doc 
+#### 1.安装doc 
+1) sh -c "$(curl -fsSL https://zpic.jiaoliuqu.com/install.sh)"
+2) cd tool
+
 ##### 目录结构
 1. doc  mac版程序
 2. doc.exe Windows程序
