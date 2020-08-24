@@ -5,18 +5,15 @@
 1) sh -c "$(curl -fsSL https://zpic.jiaoliuqu.com/install.sh)"
 2) cd tool
 
-##### 目录结构
-1. doc/doc.exe  程序
-2. ./.repo 本地仓库
-3. ./img 图片引用目录
-4. ./posts 工作区文章目录
-
 #### 2.初始化 
 
 ```
 ./doc init xxx
 ```
-xxx 为用户token
+xxx 为用户token,初始化完成会自动生成下面目录
+1. ./.repo 本地仓库 (不要去动)
+2. ./img 图片引用目录
+3. ./posts 工作区文章目录
 
 #### 3.创建一个hello.md的文章
 
