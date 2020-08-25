@@ -25,7 +25,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.0.11"
+	version    = "0.1.2"
 )
 
 var (
@@ -789,13 +789,17 @@ func Update() {
 
 // Update2Ser 更新版本到服务器
 func Update2Ser(version string) {
-	token, err := getUploadToken("")
-	if err != nil {
-		log.Printf("拉取七牛上传token异常:%s", err.Error())
+	if UserToken == "" {
+		log.Printf("用户token为空,请先初始化")
 		return
 	}
 
 	fileNameMac := "doc_" + version
+	token, err := getUploadToken(fileNameMac)
+	if err != nil {
+		log.Printf("拉取七牛上传token异常:%s", err.Error())
+		return
+	}
 	_, err = qiniu.UploadFile("doc", fileNameMac, token)
 	if err != nil {
 		log.Printf("程序mac版本上传异常:%s", err.Error())
@@ -804,6 +808,11 @@ func Update2Ser(version string) {
 	log.Printf("程序mac版本上传成功,文件:%s", fileNameMac)
 
 	fileNameExe := "doc_" + version + ".exe"
+	token, err = getUploadToken(fileNameExe)
+	if err != nil {
+		log.Printf("拉取七牛上传token异常:%s", err.Error())
+		return
+	}
 	_, err = qiniu.UploadFile("doc.exe", fileNameExe, token)
 	if err != nil {
 		log.Printf("程序win版本上传异常:%s", err.Error())
@@ -812,7 +821,7 @@ func Update2Ser(version string) {
 	log.Printf("程序win版本上传成功,文件:%s", fileNameExe)
 
 	form := url.Values{"version": {version}}
-	_, err = pkg.ClientCall(ServerHost+"/info/client?action=SetVersion&token="+UserToken, form)
+	_, err = pkg.ClientCall(ServerHost+"/info/client?action=setVersion&token="+UserToken, form)
 	if err != nil {
 		log.Printf("版本设置失败:%s", err.Error())
 		return
