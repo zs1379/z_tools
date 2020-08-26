@@ -25,7 +25,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.1.2"
+	version    = "0.1.3"
 )
 
 var (
@@ -59,7 +59,7 @@ func init() {
 	}
 	err = os.MkdirAll(repoObjPath, os.ModePerm)
 	if err != nil {
-		log.Printf("创建object目录异常:%s", err.Error())
+		log.Printf("创建repo/objects目录异常:%s", err.Error())
 		return
 	}
 }
@@ -452,18 +452,23 @@ func Push() {
 			if (r.Md5 == v.Md5 && r.Status == v.Status) || pkg.TimeCompare(r.UpdateTime, v.UpdateTime) {
 				continue
 			}
+
+			// 删除远程文件
+			if v.Status == "-2" && r.Status != "-2" {
+				form := url.Values{"filename": {v.FileName}}
+				url := fmt.Sprintf("%s/info/client?token=%s&action=delete", ServerHost, UserToken)
+				_, err = pkg.ClientCall(url, form)
+				if err != nil {
+					log.Printf("删除远程文章异常:%s,文章:%s", err.Error(), v.FileName)
+				} else {
+					log.Printf("删除远程文章成功,文章:%s", v.FileName)
+				}
+				continue
+			}
 		}
 
-		// 本地删除的情况,单独调用接口
-		if v.Status == "-2" && r.Status != "-2" {
-			form := url.Values{"filename": {v.FileName}}
-			url := fmt.Sprintf("%s/info/client?token=%s&action=delete", ServerHost, UserToken)
-			_, err = pkg.ClientCall(url, form)
-			if err != nil {
-				log.Printf("删除远程文章异常:%s,文章:%s", err.Error(), v.FileName)
-			} else {
-				log.Printf("删除远程文章成功,文章:%s", v.FileName)
-			}
+		// 本地删除的情况跳过
+		if v.Status == "-2" {
 			continue
 		}
 
@@ -931,7 +936,7 @@ func replaceImg(filePath string) error {
 			continue
 		}
 
-		ret, err := qiniu.UploadFile(imgURL[1:], pkg.GetKey() + ext, imgToken)
+		ret, err := qiniu.UploadFile(imgURL[1:], pkg.GetKey()+ext, imgToken)
 		if err != nil {
 			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
 			continue
@@ -999,7 +1004,7 @@ func getRemoteVersion() (string, error) {
 
 	v, _ := i["version"].(string)
 	if v == "" {
-		return "", fmt.Errorf("拉取版本异常,token为空,后端返回内容:%v",data)
+		return "", fmt.Errorf("拉取版本异常,token为空,后端返回内容:%v", data)
 	}
 
 	arr := strings.Split(v, ".")
@@ -1026,12 +1031,12 @@ func getUploadToken(key string) (string, error) {
 
 	i, ok := data.(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("获取token返回值格式异常%v",data)
+		return "", fmt.Errorf("获取token返回值格式异常%v", data)
 	}
 
 	token := i["token"].(string)
 	if token == "" {
-		return "", fmt.Errorf("获取失败,token为空,返回内容:%v",data)
+		return "", fmt.Errorf("获取失败,token为空,返回内容:%v", data)
 	}
 	return token, nil
 }
