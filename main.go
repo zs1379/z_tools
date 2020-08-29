@@ -636,7 +636,6 @@ func doAdd(fileName string) {
 		return
 	}
 
-	var uuid string
 	if repoPost == nil {
 		p := &PostDesc{
 			Title:      title,
@@ -644,7 +643,7 @@ func doAdd(fileName string) {
 			Md5:        fileMd5,
 			UpdateTime: time.Now().Format("2006-01-02 15:04:05"),
 		}
-		localRepoPosts[uuid] = p
+		localRepoPosts[fileName] = p
 	} else {
 		// 移除旧文件
 		os.Remove(repoObjPath + repoPost.Md5)
@@ -652,7 +651,7 @@ func doAdd(fileName string) {
 		repoPost.Title = title
 		repoPost.Md5 = fileMd5
 		repoPost.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
-		localRepoPosts[uuid] = repoPost
+		localRepoPosts[fileName] = repoPost
 	}
 
 	_, err = pkg.CopyFile(repoObjPath+fileMd5, workPostsPath+fileName)
