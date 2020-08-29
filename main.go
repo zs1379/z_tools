@@ -807,7 +807,7 @@ func Update2Ser(version string) {
 	fileNameMac := "doc_" + version
 	token, err := getUploadToken(fileNameMac)
 	if err != nil {
-		log.Printf("拉取七牛上传token异常:%s", err.Error())
+		log.Printf("拉取七牛文件上传凭证异常:%s", err.Error())
 		return
 	}
 	_, err = qiniu.UploadFile("doc", fileNameMac, token)
@@ -820,7 +820,7 @@ func Update2Ser(version string) {
 	fileNameExe := "doc_" + version + ".exe"
 	token, err = getUploadToken(fileNameExe)
 	if err != nil {
-		log.Printf("拉取七牛上传token异常:%s", err.Error())
+		log.Printf("拉取七牛文件上传凭证异常:%s", err.Error())
 		return
 	}
 	_, err = qiniu.UploadFile("doc.exe", fileNameExe, token)
@@ -846,7 +846,7 @@ func UpdateInstallShell() {
 
 	token, err := getUploadToken(installMac)
 	if err != nil {
-		log.Printf("拉取七牛上传token异常:%s", err.Error())
+		log.Printf("拉取七牛文件上传凭证异常:%s", err.Error())
 		return
 	}
 
@@ -917,7 +917,7 @@ func replaceImg(filePath string) error {
 	var imgToken string
 	imgToken, err = getUploadToken("")
 	if err != nil {
-		return errors.New("拉取七牛上传token异常:" + err.Error())
+		return errors.New("拉取七牛文件上传凭证异常:" + err.Error())
 	}
 
 	for _, v := range c {
@@ -1009,7 +1009,7 @@ func getRemoteVersion() (string, error) {
 
 	v, _ := i["version"].(string)
 	if v == "" {
-		return "", fmt.Errorf("拉取版本异常,token为空,后端返回内容:%v", data)
+		return "", fmt.Errorf("拉取版本异常,version字段为空,后端返回内容:%v", data)
 	}
 
 	arr := strings.Split(v, ".")
@@ -1036,12 +1036,12 @@ func getUploadToken(key string) (string, error) {
 
 	i, ok := data.(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("获取token返回值格式异常%v", data)
+		return "", fmt.Errorf("获取七牛返回值格式异常%v", data)
 	}
 
 	token := i["token"].(string)
 	if token == "" {
-		return "", fmt.Errorf("获取失败,token为空,返回内容:%v", data)
+		return "", fmt.Errorf("获取失败,返回内容:%v", data)
 	}
 	return token, nil
 }
