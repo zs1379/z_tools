@@ -25,7 +25,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.1.3"
+	version    = "0.1.4"
 )
 
 var (
@@ -37,13 +37,18 @@ var (
 	workPostsPath = "./posts/"
 )
 
+const (
+	StatusUserDel = "-2" // 用户删除
+	StatusAdmDel  = "-3" // 管理员删除
+)
+
 // PostDesc 文章描述
 type PostDesc struct {
 	Title      string `json:"title"`       // title
 	FileName   string `json:"file_name"`   // 文件名称
-	UpdateTime string `json:"update_time"` // 文章更新时间
-	Md5        string `json:"file_md5"`    // 文章MD5
-	Status     string `json:"status"`      // 文件状态 -2:自己删除 -3:管理员删除
+	UpdateTime string `json:"update_time"` // 更新时间
+	Md5        string `json:"file_md5"`    // 文件MD5
+	Status     string `json:"status"`      // 文件状态 -2:自己删除 -3:管理员删除 其他状态这边暂时用不到
 }
 
 func init() {
@@ -82,7 +87,7 @@ func main() {
 				ArgsUsage:   "[token]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
-						log.Printf("请输入token")
+						log.Printf("请输入token,命令行格式./doc init 用户token")
 						return nil
 					}
 					env := "online"
@@ -100,7 +105,7 @@ func main() {
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
-						log.Printf("请输入文件名")
+						log.Printf("请输入文件名,命令行格式./doc new xx.md")
 						return nil
 					}
 					NewDoc(c.Args().Get(0))
@@ -114,7 +119,7 @@ func main() {
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
-						log.Printf("请输入文件名")
+						log.Printf("请输入文件名,命令行格式./doc add xx.md")
 						return nil
 					}
 					Add(c.Args().Get(0))
@@ -148,7 +153,7 @@ func main() {
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
-						log.Printf("请输入文件名")
+						log.Printf("请输入文件名,命令行格式./doc rm xx.md")
 						return nil
 					}
 					Rm(c.Args().Get(0))
@@ -172,7 +177,7 @@ func main() {
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
-						log.Printf("请输入文件名")
+						log.Printf("请输入文件名,命令行格式./doc checkout xx.md 支持点号")
 						return nil
 					}
 					Checkout(c.Args().Get(0))
@@ -339,9 +344,9 @@ func Pull() {
 		}
 
 		// 如果文件远程被删除,则本地也相应删除
-		if remote.Status == "-2" || remote.Status == "-3" {
+		if remote.Status == StatusUserDel || remote.Status == StatusAdmDel {
 			local, ok := localRepoPosts[remote.FileName]
-			if ok && local.Status != "-2" && local.Status != "-3" {
+			if ok && local.Status != StatusUserDel && local.Status != StatusAdmDel {
 				os.Remove(repoObjPath + local.Md5)
 				os.Remove(local.FileName)
 				log.Printf("文件远程被删除,删除本地文件:%s", remote.FileName)
@@ -353,7 +358,7 @@ func Pull() {
 		// 更新本地repo
 		local, ok := localRepoPosts[remote.FileName]
 		if ok {
-			if local.Md5 == remote.Md5 || pkg.TimeCompare(local.UpdateTime, remote.UpdateTime) {
+			if (local.Md5 == remote.Md5 && local.Status == remote.Status) || pkg.TimeCompare(local.UpdateTime, remote.UpdateTime) {
 				continue
 			}
 		}
@@ -434,9 +439,9 @@ func Push() {
 		remotePosts[p.FileName] = p
 
 		// 如果远程文章被删除,则本地也一并删除
-		if p.Status == "-3" || p.Status == "-2" {
+		if p.Status == StatusUserDel || p.Status == StatusAdmDel {
 			local, ok := localRepoPosts[p.FileName]
-			if ok && local.Status != "-2" && local.Status != "-3" {
+			if ok && local.Status != StatusUserDel && local.Status != StatusAdmDel {
 				os.Remove(repoObjPath + local.Md5)
 				os.Remove(local.FileName)
 				log.Printf("文件远程被删除,删除本地文件:%s", p.FileName)
@@ -454,7 +459,7 @@ func Push() {
 			}
 
 			// 删除远程文件
-			if v.Status == "-2" && r.Status != "-2" {
+			if v.Status == StatusUserDel && r.Status != StatusUserDel {
 				form := url.Values{"filename": {v.FileName}}
 				url := fmt.Sprintf("%s/info/client?token=%s&action=delete", ServerHost, UserToken)
 				_, err = pkg.ClientCall(url, form)
@@ -468,7 +473,7 @@ func Push() {
 		}
 
 		// 本地删除的情况跳过
-		if v.Status == "-2" {
+		if v.Status == StatusUserDel {
 			continue
 		}
 
@@ -563,12 +568,12 @@ func Rm(fileName string) {
 		return
 	}
 
-	if local.Status == "-3" || local.Status == "-2" {
+	if local.Status == StatusUserDel || local.Status == StatusAdmDel {
 		log.Printf("该文件已经被删除过:%s", fileName)
 		return
 	}
 
-	local.Status = "-2"
+	local.Status = StatusUserDel
 	local.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
 
 	os.Remove(workPostsPath + fileName)
@@ -669,7 +674,7 @@ func Checkout(fileName string) {
 
 	if fileName == "." {
 		for _, v := range localRepoPosts {
-			if v.Status == "-2" || v.Status == "-3" {
+			if v.Status == StatusUserDel || v.Status == StatusAdmDel {
 				continue
 			}
 			_, err = pkg.CopyFile(workPostsPath+v.FileName, repoObjPath+v.Md5)

@@ -139,7 +139,7 @@ func GetKey() string {
 func TimeCompare(timeStr1, timeStr2 string) bool {
 	time1, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr1, time.Local)
 	time2, _ := time.ParseInLocation("2006-01-02 15:04:05", timeStr2, time.Local)
-	return time1.Unix() > time2.Unix()
+	return time1.Unix() >= time2.Unix()
 }
 
 // respData 返回给客户端的数据
