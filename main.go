@@ -348,7 +348,7 @@ func Pull() {
 			local, ok := localRepoPosts[remote.FileName]
 			if ok && local.Status != StatusUserDel && local.Status != StatusAdmDel {
 				os.Remove(repoObjPath + local.Md5)
-				os.Remove(local.FileName)
+				os.Remove(workPostsPath + local.FileName)
 				log.Printf("文件远程被删除,删除本地文件:%s", remote.FileName)
 			}
 			localRepoPosts[remote.FileName] = &remote
@@ -443,7 +443,7 @@ func Push() {
 			local, ok := localRepoPosts[p.FileName]
 			if ok && local.Status != StatusUserDel && local.Status != StatusAdmDel {
 				os.Remove(repoObjPath + local.Md5)
-				os.Remove(local.FileName)
+				os.Remove(workPostsPath + local.FileName)
 				log.Printf("文件远程被删除,删除本地文件:%s", p.FileName)
 			}
 			localRepoPosts[p.FileName] = &p
