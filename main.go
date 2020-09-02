@@ -504,7 +504,46 @@ func Push() {
 
 // NewDoc 新建文件
 func NewDoc(fileName string) {
-	err := checkFilePath(fileName)
+	l, err := getPostType()
+	fmt.Println(fmt.Sprintf("请输入你的分类,多个空格隔开,目前支持的分类如下:"))
+	fmt.Println("[" + strings.Join(l, " ") + "]")
+	input := bufio.NewScanner(os.Stdin)
+
+	var postListRaw []string
+	for {
+		input.Scan()
+		postList := strings.Split(strings.TrimSpace(input.Text()), " ")
+		if len(postList) == 0 {
+			fmt.Println("请输入分类！")
+			continue
+		}
+		var errMsg string
+		for _, v := range postList {
+			if v == "" {
+				errMsg = fmt.Sprintf("分类为空,请求重新输入")
+				break
+			}
+
+			find := false
+			for _, vv := range l {
+				if strings.ToLower(v) == strings.ToLower(vv) {
+					find = true
+					postListRaw = append(postListRaw, vv)
+					continue
+				}
+			}
+			if !find {
+				errMsg = fmt.Sprintf("未知分类:%s,请求重新输入", v)
+				break
+			}
+		}
+		if errMsg == "" {
+			break
+		}
+		fmt.Println(errMsg)
+	}
+
+	err = checkFilePath(fileName)
 	if err != nil {
 		log.Printf("文件名非法,err:" + err.Error())
 		return
@@ -515,16 +554,19 @@ func NewDoc(fileName string) {
 		log.Printf("文件已经存在,文件:%s", fileName)
 		return
 	}
+
 	docFormat := `---
 title: %s
+category: %s
 ---`
 
-	docContent := fmt.Sprintf(docFormat, fileName[0:len(fileName)-3])
+	docContent := fmt.Sprintf(docFormat, fileName[0:len(fileName)-3], strings.Join(postListRaw, ","))
 	err = ioutil.WriteFile(workPostsPath+fileName, []byte(docContent), 0644)
 	if err != nil {
 		log.Printf("本地创建文章异常:%s,文章:%s", err.Error(), fileName)
 		return
 	}
+	log.Printf("文件创建成功, 文件名:%s, 分类:%s", fileName, strings.Join(postListRaw, " "))
 	return
 }
 
@@ -625,9 +667,9 @@ func doAdd(fileName string) {
 		return
 	}
 
-	title, err := getMDTile(workPostsPath + fileName)
+	title, _, err := getMDTileCategory(workPostsPath + fileName)
 	if err != nil {
-		log.Printf("获取文件title异常,err:%s,文件名:%s", err.Error(), fileName)
+		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
 	}
 
@@ -878,6 +920,8 @@ func inIgnoreList(file string) bool {
 		ignoreList = strings.Split(string(b), "\n")
 	}
 
+	ignoreList = append(ignoreList, ".DS_Store")
+
 	for _, v := range ignoreList {
 		if v == file {
 			return true
@@ -958,41 +1002,58 @@ func replaceImg(filePath string) error {
 	return nil
 }
 
-// getMDTile 获取title
-func getMDTile(filePath string) (string, error) {
+// getMDTileCategory 获取title和分类
+func getMDTileCategory(filePath string) (string, string, error) {
 	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	r := bufio.NewReader(strings.NewReader(string(b)))
 	line1, _, err := r.ReadLine()
 	if err != nil {
-		return "", errors.New("第一行读取错误:" + err.Error())
+		return "", "", errors.New("第一行读取错误:" + err.Error())
 	}
 
 	if string(line1) != "---" {
-		return "", errors.New("格式错误,文档第一行需---开头")
+		return "", "", errors.New("格式错误,文档第一行需---开头")
 	}
 
 	line2, _, err := r.ReadLine()
 	if err != nil {
-		return "", errors.New("第二行读取错误:" + err.Error())
+		return "", "", errors.New("第二行读取错误:" + err.Error())
 	}
 
 	line2Str := string(line2)
 	if len(line2Str) <= 6 {
-		return "", errors.New("格式错误,文档第二行需title:开头")
+		return "", "", errors.New("格式错误,文档第二行需title:开头")
 	}
 	if line2Str[:6] != "title:" {
-		return "", errors.New("格式错误,文档第二行需title:开头")
+		return "", "", errors.New("格式错误,文档第二行需title:开头")
 	}
 
 	title := strings.TrimSpace(line2Str[6:])
 	if title == "" {
-		return "", errors.New("title不能为空")
+		return "", "", errors.New("title不能为空")
 	}
-	return title, nil
+
+	line3, _, err := r.ReadLine()
+	if err != nil {
+		return "", "", errors.New("第三行读取错误:" + err.Error())
+	}
+	line3Str := string(line3)
+	if len(line3Str) <= 9 {
+		return "", "", errors.New("格式错误,文档第三行需category:开头")
+	}
+	if line3Str[:6] != "category:" {
+		return "", "", errors.New("格式错误,文档第三行需category:开头")
+	}
+
+	category := strings.TrimSpace(line2Str[6:])
+	if category == "" {
+		return "", "", errors.New("category不能为空")
+	}
+	return title, category, nil
 }
 
 // getRemoteVersion 获取服务器版本号
@@ -1043,4 +1104,29 @@ func getUploadToken(key string) (string, error) {
 		return "", fmt.Errorf("获取失败,返回内容:%v", data)
 	}
 	return token, nil
+}
+
+func getPostType() ([]string, error) {
+	u := ServerHost + "/info/client?action=getCategory"
+	data, err := pkg.ClientCall(u, url.Values{})
+	if err != nil {
+		return nil, err
+	}
+	list, ok := data.([]interface{})
+	if !ok {
+		return nil, nil
+	}
+	var l []string
+	for _, v := range list {
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		t, ok := m["name"].(string)
+		if !ok {
+			continue
+		}
+		l = append(l, t)
+	}
+	return l, nil
 }
