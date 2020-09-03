@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,11 +101,11 @@ func main() {
 			{
 				Name:        "new",
 				Usage:       "新建文章",
-				Description: "1. doc new test.md 本地自动生成一篇test.md的空文档",
+				Description: "1. doc new test 本地自动生成一篇test.md的空文档",
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
-						log.Printf("请输入文件名,命令行格式./doc new xx.md")
+						log.Printf("请输入文件名,命令行格式./doc new xx")
 						return nil
 					}
 					NewDoc(c.Args().Get(0))
@@ -511,8 +512,17 @@ func Push() {
 // NewDoc 新建文件
 func NewDoc(fileName string) {
 	l, err := getCategory()
-	fmt.Println(fmt.Sprintf("请输入你的分类(单选),目前支持的分类如下:"))
-	fmt.Println("[" + strings.Join(l, " ") + "]")
+	fmt.Println()
+	fmt.Println(fmt.Sprintf("    选择你文章的分类(单选),目前支持的分类如下:"))
+
+	var str string
+	for k, v := range l {
+		str += fmt.Sprintf("%d:%s ", k+1, v)
+	}
+	fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, str)
+	fmt.Println()
+	fmt.Print("    请输入分类编号:")
+
 	input := bufio.NewScanner(os.Stdin)
 
 	var category string
@@ -520,25 +530,31 @@ func NewDoc(fileName string) {
 		input.Scan()
 		v := strings.TrimSpace(input.Text())
 		if v == "" {
-			fmt.Println("分类为空,请求重新输入")
+			fmt.Print("    输入为空,请重新输入:")
 			continue
 		}
 
-		var find string
-		for _, vv := range l {
-			if strings.ToLower(v) == strings.ToLower(vv) {
-				find = vv
-				break
-			}
-		}
-		if find == "" {
-			fmt.Println(fmt.Sprintf("未知分类:%s,请求重新输入", v))
+		vIndex, err := strconv.Atoi(v)
+		if err != nil {
+			fmt.Print("    输入的编号需为数字,请重新输入:")
 			continue
 		}
-		category = find
+		if vIndex > len(l) || vIndex < 1 {
+			fmt.Print("    输入的编号不存在,请重新输入:")
+			continue
+		}
+
+		category = l[vIndex-1]
 
 		break
 	}
+	fmt.Println()
+
+	i := strings.Index(fileName, ".")
+	if i > 0 {
+		fmt.Println(fileName[:i])
+	}
+	fileName += ".md"
 
 	err = checkFilePath(fileName)
 	if err != nil {
@@ -672,11 +688,17 @@ func doAdd(fileName string) {
 	if err != nil {
 		docFormat := `---
 title: 这是标题
-category: 架构
+category: 文章分类
 ---`
 		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
+		fmt.Println()
 		fmt.Println("文档标准格式如下:")
 		fmt.Println(docFormat)
+		l, _ := getCategory()
+		fmt.Println()
+		fmt.Println(fmt.Sprintf("目前支持的分类如下:"))
+		fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(l, " "))
+		fmt.Println()
 		return
 	}
 
