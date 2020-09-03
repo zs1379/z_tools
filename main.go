@@ -26,7 +26,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.1.6"
+	version    = "0.1.8"
 )
 
 var (
@@ -552,7 +552,7 @@ func NewDoc(fileName string) {
 
 	i := strings.Index(fileName, ".")
 	if i > 0 {
-		fmt.Println(fileName[:i])
+		fileName = fileName[:i]
 	}
 	fileName += ".md"
 
