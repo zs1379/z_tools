@@ -26,7 +26,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.1.8"
+	version    = "0.1.9"
 )
 
 var (
@@ -699,6 +699,13 @@ category: 文章分类
 		fmt.Println(fmt.Sprintf("目前支持的分类如下:"))
 		fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(l, " "))
 		fmt.Println()
+		return
+	}
+
+	// 重新获取md5
+	fileMd5, err = pkg.GetFileMd5(workPostsPath + fileName)
+	if err != nil {
+		log.Printf("获取文件md5异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
 	}
 
