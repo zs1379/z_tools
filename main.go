@@ -511,42 +511,33 @@ func Push() {
 // NewDoc 新建文件
 func NewDoc(fileName string) {
 	l, err := getCategory()
-	fmt.Println(fmt.Sprintf("请输入你的分类,多个空格隔开,目前支持的分类如下:"))
+	fmt.Println(fmt.Sprintf("请输入你的分类(单选),目前支持的分类如下:"))
 	fmt.Println("[" + strings.Join(l, " ") + "]")
 	input := bufio.NewScanner(os.Stdin)
 
-	var postListRaw []string
+	var category string
 	for {
 		input.Scan()
-		postList := strings.Split(strings.TrimSpace(input.Text()), " ")
-		if len(postList) == 0 {
-			fmt.Println("请输入分类！")
+		v := strings.TrimSpace(input.Text())
+		if v == "" {
+			fmt.Println("分类为空,请求重新输入")
 			continue
 		}
-		var errMsg string
-		for _, v := range postList {
-			if v == "" {
-				errMsg = fmt.Sprintf("分类为空,请求重新输入")
-				break
-			}
 
-			find := false
-			for _, vv := range l {
-				if strings.ToLower(v) == strings.ToLower(vv) {
-					find = true
-					postListRaw = append(postListRaw, vv)
-					continue
-				}
-			}
-			if !find {
-				errMsg = fmt.Sprintf("未知分类:%s,请求重新输入", v)
+		find := false
+		for _, vv := range l {
+			if strings.ToLower(v) == strings.ToLower(vv) {
+				find = true
 				break
 			}
 		}
-		if errMsg == "" {
-			break
+		if !find {
+			fmt.Println(fmt.Sprintf("未知分类:%s,请求重新输入", v))
+			continue
 		}
-		fmt.Println(errMsg)
+
+		category = v
+		break
 	}
 
 	err = checkFilePath(fileName)
@@ -566,13 +557,13 @@ title: %s
 category: %s
 ---`
 
-	docContent := fmt.Sprintf(docFormat, fileName[0:len(fileName)-3], strings.Join(postListRaw, ","))
+	docContent := fmt.Sprintf(docFormat, fileName[0:len(fileName)-3], category)
 	err = ioutil.WriteFile(workPostsPath+fileName, []byte(docContent), 0644)
 	if err != nil {
 		log.Printf("本地创建文章异常:%s,文章:%s", err.Error(), fileName)
 		return
 	}
-	log.Printf("文件创建成功, 文件名:%s, 分类:%s", fileName, strings.Join(postListRaw, " "))
+	log.Printf("文件创建成功,文件名:%s, 分类:%s", fileName, category)
 	return
 }
 
@@ -677,7 +668,7 @@ func doAdd(fileName string) {
 	if err != nil {
 		docFormat := `---
 title: 这是标题
-category: java,go
+category: 架构
 ---`
 		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
 		fmt.Println("文档标准格式如下:")
