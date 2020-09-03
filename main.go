@@ -26,7 +26,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.2.0"
+	version    = "0.1.10"
 )
 
 var (
@@ -231,6 +231,12 @@ func main() {
 	}
 	UserToken = ReadToken()
 
+	// 用户token校验
+	if len(os.Args) >= 2 && os.Args[1] != "init" && UserToken == ""{
+		log.Printf("用户token为空,请到小程序我的TAB页复制,并执行./doc init 用户token 进行初始化~")
+		return
+	}
+
 	autoUpdate()
 
 	err := app.Run(os.Args)
@@ -248,7 +254,6 @@ func autoUpdate() {
 
 	WriteUpdateTime()
 	Update(true)
-	os.Exit(0)
 }
 
 // ReadIndex 读取索引
@@ -335,11 +340,6 @@ func WriteUpdateTime() {
 
 // Pull 拉取远程
 func Pull() {
-	if UserToken == "" {
-		log.Printf("用户token为空,请先初始化")
-		return
-	}
-
 	localRepoPosts, err := ReadIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
@@ -431,11 +431,6 @@ func Pull() {
 
 // Push 推到远程服务器
 func Push() {
-	if UserToken == "" {
-		log.Printf("用户token为空,请先初始化")
-		return
-	}
-
 	localRepoPosts, err := ReadIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
@@ -573,7 +568,6 @@ func NewDoc(fileName string) {
 		}
 
 		category = l[vIndex-1]
-
 		break
 	}
 	fmt.Println()
@@ -757,6 +751,7 @@ category: 文章分类
 	if err != nil {
 		log.Printf("写入索引异常:%s", err.Error())
 	}
+	log.Printf("文章提交到本地仓库成功:%s",fileName)
 	WriteIndex(localRepoPosts)
 
 	return
@@ -846,11 +841,16 @@ func Status() {
 
 // Update 版本升级
 func Update(auto bool) {
+	defer os.Exit(0)
+
 	remoteV, err := getRemoteVersion()
 	if err != nil {
 		log.Printf("获取版本号异常:%s", err.Error())
 		return
 	}
+
+	// 更新时间
+	WriteUpdateTime()
 
 	// 判断是否需要升级版本
 	if !pkg.VersionCompare(remoteV, version) {
@@ -860,7 +860,21 @@ func Update(auto bool) {
 		return
 	}
 
-	log.Printf("检测到新版本,当前版本:%s,远程版本:%s,升级中....", version, remoteV)
+	// 自动检测的给用户选择
+	if auto {
+		fmt.Println()
+		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, "检测到有新版本,是否升级,按n取消~")
+		fmt.Printf("    请输入:")
+		input := bufio.NewScanner(os.Stdin)
+		input.Scan()
+		v := strings.TrimSpace(input.Text())
+		if strings.ToLower(v) == "n" {
+			fmt.Println("    取消升级~")
+			return
+		}
+	}
+
+	log.Printf("当前版本:%s,远程版本:%s,升级中....", version, remoteV)
 
 	oldFile := "doc"
 	newFile := fmt.Sprintf("doc_%s", remoteV)
@@ -894,18 +908,11 @@ func Update(auto bool) {
 		return
 	}
 
-	// 更新时间
-	WriteUpdateTime()
 	log.Printf("升级版本完成当前版本号:%s", remoteV)
 }
 
 // Update2Ser 更新版本到服务器
 func Update2Ser(version string) {
-	if UserToken == "" {
-		log.Printf("用户token为空,请先初始化")
-		return
-	}
-
 	fileNameMac := "doc_" + version
 	token, err := getUploadToken(fileNameMac)
 	if err != nil {
@@ -1142,10 +1149,6 @@ func getRemoteVersion() (string, error) {
 
 // getUploadToken 获取七牛token
 func getUploadToken(key string) (string, error) {
-	if UserToken == "" {
-		return "", errors.New("用户token为空,请先初始化")
-	}
-
 	u := ServerHost + "/basic/getPicToken?token=" + UserToken
 	if key != "" {
 		u += "&key=" + key
