@@ -524,19 +524,19 @@ func NewDoc(fileName string) {
 			continue
 		}
 
-		find := false
+		var find string
 		for _, vv := range l {
 			if strings.ToLower(v) == strings.ToLower(vv) {
-				find = true
+				find = vv
 				break
 			}
 		}
-		if !find {
+		if find == "" {
 			fmt.Println(fmt.Sprintf("未知分类:%s,请求重新输入", v))
 			continue
 		}
+		category = find
 
-		category = v
 		break
 	}
 
@@ -637,6 +637,16 @@ func doAdd(fileName string) {
 		return
 	}
 
+	fileMd5, err := pkg.GetFileMd5(workPostsPath + fileName)
+	if err != nil {
+		log.Printf("获取文件md5异常,err:%s,文件名:%s", err.Error(), fileName)
+		return
+	}
+	repoPost, ok := localRepoPosts[fileName]
+	if ok && repoPost.Md5 == fileMd5 {
+		return
+	}
+
 	exist, err := pkg.PathExists(workPostsPath + fileName)
 	if err != nil {
 		log.Printf("判断文件是否存在异常,err:%s,文件名:%s", err.Error(), fileName)
@@ -658,12 +668,6 @@ func doAdd(fileName string) {
 		return
 	}
 
-	fileMd5, err := pkg.GetFileMd5(workPostsPath + fileName)
-	if err != nil {
-		log.Printf("获取文件md5异常,err:%s,文件名:%s", err.Error(), fileName)
-		return
-	}
-
 	_, _, err = getMDTileCategory(workPostsPath + fileName)
 	if err != nil {
 		docFormat := `---
@@ -673,11 +677,6 @@ category: 架构
 		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
 		fmt.Println("文档标准格式如下:")
 		fmt.Println(docFormat)
-		return
-	}
-
-	repoPost, ok := localRepoPosts[fileName]
-	if ok && repoPost.Md5 == fileMd5 {
 		return
 	}
 
