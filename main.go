@@ -44,7 +44,6 @@ const (
 
 // PostDesc 文章描述
 type PostDesc struct {
-	Title      string `json:"title"`       // title
 	FileName   string `json:"file_name"`   // 文件名称
 	UpdateTime string `json:"update_time"` // 更新时间
 	Md5        string `json:"file_md5"`    // 文件MD5
@@ -377,7 +376,6 @@ func Pull() {
 		}
 
 		content, _ := data["content"].(string)
-		remote.Title, _ = data["title"].(string)
 
 		err = pkg.Write2File([]byte(content), repoObjPath+remote.Md5)
 		if err != nil {
@@ -483,14 +481,22 @@ func Push() {
 			continue
 		}
 
+		title, category, err := getMDTileCategory(repoObjPath + v.Md5)
+		if err != nil {
+			log.Printf("读取文章title和分类异常:%s,文章:%s", err.Error(), v.FileName)
+			continue
+		}
+
 		content := string(b)
 		form := url.Values{
 			"filename": {v.FileName},
 			"token":    {UserToken},
 			"md5":      {v.Md5},
 			"content":  {content},
-			"title":    {v.Title},
+			"title":    {title},
+			"category": {category},
 		}
+
 		url := fmt.Sprintf("%s/info/client?token=%s&action=add", ServerHost, UserToken)
 		_, err = pkg.ClientCall(url, form)
 		if err != nil {
@@ -504,7 +510,7 @@ func Push() {
 
 // NewDoc 新建文件
 func NewDoc(fileName string) {
-	l, err := getPostType()
+	l, err := getCategory()
 	fmt.Println(fmt.Sprintf("请输入你的分类,多个空格隔开,目前支持的分类如下:"))
 	fmt.Println("[" + strings.Join(l, " ") + "]")
 	input := bufio.NewScanner(os.Stdin)
@@ -667,7 +673,7 @@ func doAdd(fileName string) {
 		return
 	}
 
-	title, _, err := getMDTileCategory(workPostsPath + fileName)
+	_, _, err = getMDTileCategory(workPostsPath + fileName)
 	if err != nil {
 		docFormat := `---
 title: 这是标题
@@ -686,7 +692,6 @@ category: java,go
 
 	if repoPost == nil {
 		p := &PostDesc{
-			Title:      title,
 			FileName:   fileName,
 			Md5:        fileMd5,
 			UpdateTime: time.Now().Format("2006-01-02 15:04:05"),
@@ -696,7 +701,6 @@ category: java,go
 		// 移除旧文件
 		os.Remove(repoObjPath + repoPost.Md5)
 
-		repoPost.Title = title
 		repoPost.Md5 = fileMd5
 		repoPost.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
 		localRepoPosts[fileName] = repoPost
@@ -1055,7 +1059,7 @@ func getMDTileCategory(filePath string) (string, string, error) {
 		return "", "", errors.New("格式错误,文档第三行需category:开头")
 	}
 
-	category := strings.TrimSpace(line2Str[6:])
+	category := strings.TrimSpace(line3Str[9:])
 	if category == "" {
 		return "", "", errors.New("category不能为空")
 	}
@@ -1112,7 +1116,8 @@ func getUploadToken(key string) (string, error) {
 	return token, nil
 }
 
-func getPostType() ([]string, error) {
+// getCategory 获取文章分类
+func getCategory() ([]string, error) {
 	u := ServerHost + "/info/client?action=getCategory"
 	data, err := pkg.ClientCall(u, url.Values{})
 	if err != nil {
