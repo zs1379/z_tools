@@ -26,7 +26,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.1.10"
+	version    = "0.1.11"
 )
 
 var (
@@ -232,7 +232,7 @@ func main() {
 	UserToken = ReadToken()
 
 	// 用户token校验
-	if len(os.Args) >= 2 && os.Args[1] != "init" && UserToken == ""{
+	if len(os.Args) >= 2 && os.Args[1] != "init" && UserToken == "" {
 		log.Printf("用户token为空,请到小程序我的TAB页复制,并执行./doc init 用户token 进行初始化~")
 		return
 	}
@@ -751,7 +751,7 @@ category: 文章分类
 	if err != nil {
 		log.Printf("写入索引异常:%s", err.Error())
 	}
-	log.Printf("文章提交到本地仓库成功:%s",fileName)
+	log.Printf("文章提交到本地仓库成功:%s", fileName)
 	WriteIndex(localRepoPosts)
 
 	return
@@ -841,8 +841,6 @@ func Status() {
 
 // Update 版本升级
 func Update(auto bool) {
-	defer os.Exit(0)
-
 	remoteV, err := getRemoteVersion()
 	if err != nil {
 		log.Printf("获取版本号异常:%s", err.Error())
@@ -859,6 +857,7 @@ func Update(auto bool) {
 		}
 		return
 	}
+	defer os.Exit(0)
 
 	// 自动检测的给用户选择
 	if auto {
