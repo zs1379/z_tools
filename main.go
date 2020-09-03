@@ -669,7 +669,13 @@ func doAdd(fileName string) {
 
 	title, _, err := getMDTileCategory(workPostsPath + fileName)
 	if err != nil {
+		docFormat := `---
+title: 这是标题
+category: java,go
+---`
 		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
+		fmt.Println("文档标准格式如下:")
+		fmt.Println(docFormat)
 		return
 	}
 
@@ -1045,7 +1051,7 @@ func getMDTileCategory(filePath string) (string, string, error) {
 	if len(line3Str) <= 9 {
 		return "", "", errors.New("格式错误,文档第三行需category:开头")
 	}
-	if line3Str[:6] != "category:" {
+	if line3Str[:9] != "category:" {
 		return "", "", errors.New("格式错误,文档第三行需category:开头")
 	}
 
