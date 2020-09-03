@@ -26,13 +26,14 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.1.9"
+	version    = "0.2.0"
 )
 
 var (
 	repoObjPath   = "./.repo/objects/"
 	tokenPath     = "./.repo/token"
 	envPath       = "./.repo/env"
+	updatePath    = "./.repo/updateTime"
 	indexPath     = "./.repo/index"
 	imgPath       = "./img/"
 	workPostsPath = "./posts/"
@@ -190,7 +191,7 @@ func main() {
 				Description: "1. doc update 升级程序版本",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					Update()
+					Update(false)
 					return nil
 				},
 			},
@@ -230,10 +231,24 @@ func main() {
 	}
 	UserToken = ReadToken()
 
+	autoUpdate()
+
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// autoUpdate 自动升级
+func autoUpdate() {
+	lastUpdate, _ := strconv.Atoi(ReadUpdateTime())
+	if int(time.Now().Unix())-lastUpdate < 86400 {
+		return
+	}
+
+	WriteUpdateTime()
+	Update(true)
+	os.Exit(0)
 }
 
 // ReadIndex 读取索引
@@ -290,6 +305,7 @@ func InitDoc(token string, env string) {
 		log.Printf("初始化env异常:%s", err.Error())
 		return
 	}
+	WriteUpdateTime()
 	log.Printf("初始化成功")
 }
 
@@ -303,6 +319,18 @@ func ReadToken() string {
 func ReadEnv() string {
 	b, _ := ioutil.ReadFile(envPath)
 	return string(b)
+}
+
+// ReadUpdateTime 读取安装时间
+func ReadUpdateTime() string {
+	b, _ := ioutil.ReadFile(updatePath)
+	return string(b)
+}
+
+// WriteUpdateTime 刷新安装时间
+func WriteUpdateTime() {
+	ioutil.WriteFile(updatePath, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644)
+	return
 }
 
 // Pull 拉取远程
@@ -817,7 +845,7 @@ func Status() {
 }
 
 // Update 版本升级
-func Update() {
+func Update(auto bool) {
 	remoteV, err := getRemoteVersion()
 	if err != nil {
 		log.Printf("获取版本号异常:%s", err.Error())
@@ -826,7 +854,9 @@ func Update() {
 
 	// 判断是否需要升级版本
 	if !pkg.VersionCompare(remoteV, version) {
-		log.Printf("当前已经是最新版本:%s", version)
+		if !auto {
+			log.Printf("当前已经是最新版本:%s", version)
+		}
 		return
 	}
 
@@ -864,6 +894,8 @@ func Update() {
 		return
 	}
 
+	// 更新时间
+	WriteUpdateTime()
 	log.Printf("升级版本完成当前版本号:%s", remoteV)
 }
 
