@@ -862,7 +862,7 @@ func Update(auto bool) {
 	// 自动检测的给用户选择
 	if auto {
 		fmt.Println()
-		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, "检测到有新版本,是否升级,按n取消~")
+		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, "检测到有新版本,按n取消,按其余任意键升级~")
 		fmt.Printf("    请输入:")
 		input := bufio.NewScanner(os.Stdin)
 		input.Scan()
