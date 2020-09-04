@@ -26,7 +26,7 @@ var (
 	ServerHost = "http://z.jiaoliuqu.com"
 	UserToken  string // 用户token
 	env        string // 环境
-	version    = "0.1.11"
+	version    = "0.1.12"
 )
 
 var (
@@ -391,6 +391,13 @@ func Pull() {
 			}
 		}
 
+		localRepoPosts[remote.FileName] = &remote
+
+		// 如果只是状态变更，文件没变更，则不做处理
+		if ok && local.Md5 == remote.Md5 {
+			continue
+		}
+
 		form := url.Values{"filename": {remote.FileName}}
 		retData, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?token=%s&action=get", ServerHost, UserToken), form)
 		if err != nil {
@@ -423,7 +430,6 @@ func Pull() {
 		}
 
 		log.Printf("拉取远程文章成功:%s", remote.FileName)
-		localRepoPosts[remote.FileName] = &remote
 	}
 
 	WriteIndex(localRepoPosts)
@@ -519,6 +525,7 @@ func Push() {
 			"content":  {content},
 			"title":    {title},
 			"category": {category},
+			"updateTime": {v.UpdateTime},
 		}
 
 		url := fmt.Sprintf("%s/info/client?token=%s&action=add", ServerHost, UserToken)
