@@ -35,8 +35,10 @@ var (
 	envPath       = "./.repo/env"
 	updatePath    = "./.repo/updateTime"
 	indexPath     = "./.repo/index"
+	kIndexPath    = "./.repo/kindex"
 	imgPath       = "./img/"
 	workPostsPath = "./posts/"
+	knWorkPath    = "./knowledge/"
 )
 
 const (
@@ -52,10 +54,26 @@ type PostDesc struct {
 	Status     string `json:"status"`      // 文件状态 -2:自己删除 -3:管理员删除 其他状态这边暂时用不到
 }
 
+// KnowledgeDesc 知识点描述
+type KnowledgeDesc struct {
+	KName         string `json:"kName"`          // 知识点名称
+	FileName      string `json:"FileName"`       // 文件名
+	UpdateTime    string `json:"update_time"`    // 更新时间
+	Md5           string `json:"file_md5"`       // 文件MD5
+	KnowledgeUuid string `json:"knowledge_uuid"` // uuid
+	Changelog     string `json:"changelog"`      // 修改日志
+	Version       string `json:"version"`        // 版本号
+}
+
 func init() {
 	err := os.MkdirAll(workPostsPath, os.ModePerm)
 	if err != nil {
 		log.Printf("创建工作区目录异常:%s", err.Error())
+		return
+	}
+	err = os.MkdirAll(knWorkPath, os.ModePerm)
+	if err != nil {
+		log.Printf("创建知识点工作区目录异常:%s", err.Error())
 		return
 	}
 	err = os.MkdirAll(imgPath, os.ModePerm)
@@ -219,6 +237,85 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:        "kpull",
+				Usage:       "拉取知识点",
+				Description: "1. doc kpull xx 拉取xx的知识点",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入知识点")
+						return nil
+					}
+					kPull(c.Args().Get(0))
+					return nil
+				},
+			},
+			{
+				Name:        "kadd",
+				Usage:       "提交知识点更新到本地",
+				Description: "1. doc kadd xx 要提交的知识点",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入知识点")
+						return nil
+					}
+
+					if c.NArg() < 2 {
+						log.Printf("请输入修改日志")
+						return nil
+					}
+					kAdd(c.Args().Get(0), c.Args().Get(1))
+					return nil
+				},
+			},
+			{
+				Name:        "kpush",
+				Usage:       "提交知识点更新到服务器",
+				Description: "1. doc kpush",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入知识点")
+						return nil
+					}
+					kPush()
+					return nil
+				},
+			},
+			{
+				Name:        "knew",
+				Usage:       "新建知识点",
+				Description: "1. doc knew xx 要新建的知识点",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入知识点")
+						return nil
+					}
+					kNew(c.Args().Get(0))
+					return nil
+				},
+			},
+			{
+				Name:        " krel",
+				Usage:       "给知识点创建别名",
+				Description: "1. doc  krel xx 知识点 别名",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入知识点")
+						return nil
+					}
+					if c.NArg() < 2 {
+						log.Printf("请输入别名")
+						return nil
+					}
+					krel(c.Args().Get(0), c.Args().Get(1))
+					return nil
+				},
+			},
 		},
 	}
 
@@ -292,6 +389,48 @@ func WriteIndex(m map[string]*PostDesc) error {
 		return err
 	}
 	err = ioutil.WriteFile(indexPath, b, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// ReadKIndex 读取知识点索引
+func ReadKIndex() (map[string]*KnowledgeDesc, error) {
+	m := make(map[string]*KnowledgeDesc)
+
+	b, _ := ioutil.ReadFile(kIndexPath)
+	if len(b) == 0 {
+		return m, nil
+	}
+
+	var list []*KnowledgeDesc
+	err := json.Unmarshal(b, &list)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, v := range list {
+		m[v.FileName] = v
+	}
+	return m, nil
+}
+
+// WriteKIndex 写入知识点索引
+func WriteKIndex(m map[string]*KnowledgeDesc) error {
+	var list []*KnowledgeDesc
+	for _, v := range m {
+		list = append(list, v)
+	}
+	if len(list) == 0 {
+		return nil
+	}
+
+	b, err := json.Marshal(list)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(kIndexPath, b, 0644)
 	if err != nil {
 		return err
 	}
@@ -519,12 +658,12 @@ func Push() {
 
 		content := string(b)
 		form := url.Values{
-			"filename": {v.FileName},
-			"token":    {UserToken},
-			"md5":      {v.Md5},
-			"content":  {content},
-			"title":    {title},
-			"category": {category},
+			"filename":   {v.FileName},
+			"token":      {UserToken},
+			"md5":        {v.Md5},
+			"content":    {content},
+			"title":      {title},
+			"category":   {category},
 			"updateTime": {v.UpdateTime},
 		}
 
@@ -537,6 +676,259 @@ func Push() {
 
 		log.Printf("文章推到远程成功文章:%s", v.FileName)
 	}
+}
+
+func kPull(knowledge string) {
+	localKN, err := ReadKIndex()
+	if err != nil {
+		log.Printf("读取知识点本地仓库异常:%s", err.Error())
+		return
+	}
+
+	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=kget&token=%s&kname=%s", ServerHost, UserToken, knowledge), url.Values{})
+	if err != nil {
+		log.Printf("拉取远程知识点异常:%s", err.Error())
+		return
+	}
+
+	remoteKN, ok := data.(map[string]interface{})
+	if !ok {
+		log.Printf("拉取远程知识点异常:%v", remoteKN)
+		return
+	}
+	list, ok := remoteKN["list"].([]interface{})
+	if !ok {
+		log.Printf("拉取远程知识点异常:%v", remoteKN)
+		return
+	}
+
+	err = os.MkdirAll(knWorkPath+knowledge, os.ModePerm)
+	if err != nil {
+		log.Printf("创建知识点工作区目录异常:%s", err.Error())
+		return
+	}
+
+	var remoteMaxV int
+	var remoteContent string
+	var knUUID string
+	for _, v := range list {
+		knData, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		version, ok := knData["version"].(string)
+		content, ok := knData["content"].(string)
+		changeLog, ok := knData["change_log"].(string)
+		knUUID, _ = knData["knowledge_uuid"].(string)
+
+		if knUUID == "" {
+			continue
+		}
+
+		v, _ := strconv.Atoi(version)
+		if v > remoteMaxV {
+			remoteMaxV = v
+			remoteContent = content
+		}
+
+		err = os.MkdirAll(fmt.Sprintf("%s%s/%s/", knWorkPath, knowledge, version), os.ModePerm)
+		if err != nil {
+			log.Printf("创建知识点工作区目录异常:%s", err.Error())
+			return
+		}
+		str := fmt.Sprintf("### changelog\n%s\n%s", changeLog, content)
+		err = ioutil.WriteFile(fmt.Sprintf("%s%s/%s/%s.md", knWorkPath, knowledge, version, knowledge), []byte(str), 0644)
+		if err != nil {
+			log.Printf("写入知识点文件异常:%s", err.Error())
+			return
+		}
+	}
+
+	nowVersion, ok := remoteKN["now_version"].(string)
+	err = ioutil.WriteFile(fmt.Sprintf("%s%s/version", knWorkPath, knowledge), []byte(nowVersion), 0644)
+	if err != nil {
+		log.Printf("写入知识点版本号异常:%s", err.Error())
+		return
+	}
+
+	maxMd5, _ := pkg.GetStrMd5(remoteContent)
+
+	knFilePath := fmt.Sprintf("%s/%s.md", knWorkPath, knowledge)
+	ok, _ = pkg.PathExists(knFilePath)
+	if ok {
+		knMd5, err := pkg.GetFileMd5(knFilePath)
+		if err != nil {
+		}
+		if maxMd5 != knMd5 {
+			knOldFilePath := fmt.Sprintf("%s/%s-old.md", knWorkPath, knowledge)
+			os.Rename(knFilePath, knOldFilePath)
+		}
+	}
+
+	err = ioutil.WriteFile(knFilePath, []byte(remoteContent), 0644)
+	if err != nil {
+		log.Printf("写入知识点文件异常:%s", err.Error())
+		return
+	}
+
+	knDes := &KnowledgeDesc{
+		Version:       nowVersion,
+		KName:         knowledge,
+		FileName:      knowledge + ".md",
+		Md5:           maxMd5,
+		KnowledgeUuid: knUUID,
+		UpdateTime:    time.Now().Format("2006-01-02 15:04:05"),
+	}
+	localKN[knowledge] = knDes
+
+	WriteKIndex(localKN)
+}
+
+// kPush 推到远程服务器
+func kPush() {
+	localRepoPosts, err := ReadKIndex()
+	if err != nil {
+		log.Printf("读取本地仓库异常:%s", err.Error())
+		return
+	}
+
+	for _, v := range localRepoPosts {
+		b, err := ioutil.ReadFile(repoObjPath + v.Md5)
+		if err != nil {
+			log.Printf("读取文章异常:%s,文章:%s", err.Error(), v.FileName)
+			continue
+		}
+
+		content := string(b)
+		form := url.Values{
+			"change_log":   {v.Changelog},
+			"version":      {v.Version},
+			"token":        {UserToken},
+			"kname":        {v.KName},
+			"file_content": {content},
+			"kuuid":        {v.KnowledgeUuid},
+		}
+
+		url := fmt.Sprintf("%s/info/client?token=%s&action=kadd", ServerHost, UserToken)
+		_, err = pkg.ClientCall(url, form)
+		if err != nil {
+			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
+			continue
+		}
+
+		log.Printf("文章推到远程成功文章:%s", v.FileName)
+	}
+}
+
+func kNew(knowledge string) {
+	form := url.Values{
+		"token": {UserToken},
+		"kname": {knowledge},
+	}
+
+	url := fmt.Sprintf("%s/info/client?token=%s&action=knew", ServerHost, UserToken)
+	_, err := pkg.ClientCall(url, form)
+	if err != nil {
+		log.Printf("创建知识点异常:%s,知识点:%s", err.Error(), knowledge)
+		return
+	}
+}
+
+func krel(knowledge string, rel string) {
+	form := url.Values{
+		"token":     {UserToken},
+		"kname":     {knowledge},
+		"like_name": {rel},
+	}
+
+	url := fmt.Sprintf("%s/info/client?token=%s&action=krel", ServerHost, UserToken)
+	_, err := pkg.ClientCall(url, form)
+	if err != nil {
+		log.Printf("创建知识点别名异常:%s,知识点:%s", err.Error(), knowledge)
+		return
+	}
+}
+
+// kAdd 文件工作区加入到本地仓库
+func kAdd(fileName string, changelog string) {
+	loalKN, err := ReadKIndex()
+	if err != nil {
+		log.Printf("读取本地仓库异常:%s", err.Error())
+		return
+	}
+
+	err = checkFilePath(fileName)
+	if err != nil {
+		log.Printf("文件名非法,err:%s,文件名:%s", err.Error(), fileName)
+		return
+	}
+
+	fileMd5, err := pkg.GetFileMd5(knWorkPath + fileName)
+	if err != nil {
+		log.Printf("获取文件md5异常,err:%s,文件名:%s", err.Error(), fileName)
+		return
+	}
+
+	repoPost, ok := loalKN[fileName]
+	if ok && repoPost.Md5 == fileMd5 {
+		return
+	}
+
+	exist, err := pkg.PathExists(knWorkPath + fileName)
+	if err != nil {
+		log.Printf("判断文件是否存在异常,err:%s,文件名:%s", err.Error(), fileName)
+		return
+	}
+	if !exist {
+		log.Printf("该文件不存在,文件名:%s", fileName)
+		return
+	}
+
+	if pkg.GetFileSize(knWorkPath+fileName) > 2*1024*2014 {
+		log.Printf("文章大小不支持2M以上,文件名:%s,文章大小:%d", fileName, pkg.GetFileSize(fileName))
+		return
+	}
+
+	err = replaceImg(knWorkPath + fileName)
+	if err != nil {
+		log.Printf("图片替换异常,err:%s,文件名:%s", err.Error(), fileName)
+		return
+	}
+
+	if repoPost == nil {
+		knName := fileName
+		i := strings.Index(knName, ".")
+		if i > 0 {
+			knName = knName[:i]
+		}
+
+		p := &KnowledgeDesc{
+			KName:      knName,
+			FileName:   fileName,
+			Md5:        fileMd5,
+			Changelog:  changelog,
+			UpdateTime: time.Now().Format("2006-01-02 15:04:05"),
+		}
+		loalKN[fileName] = p
+	} else {
+		// 移除旧文件
+		os.Remove(repoObjPath + repoPost.Md5)
+
+		repoPost.Changelog = changelog
+		repoPost.Md5 = fileMd5
+		repoPost.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
+		loalKN[fileName] = repoPost
+	}
+
+	_, err = pkg.CopyFile(repoObjPath+fileMd5, knWorkPath+fileName)
+	if err != nil {
+		log.Printf("写入索引异常:%s", err.Error())
+	}
+	log.Printf("文章提交到本地仓库成功:%s", fileName)
+	WriteKIndex(loalKN)
+
+	return
 }
 
 // NewDoc 新建文件

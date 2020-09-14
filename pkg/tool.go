@@ -31,6 +31,13 @@ func GetFileMd5(filePath string) (string, error) {
 	return hex.EncodeToString(md5Ctx.Sum(nil)), nil
 }
 
+// GetStrMd5 获取md5
+func GetStrMd5(str string) (string, error) {
+	md5Ctx := md5.New()
+	md5Ctx.Write([]byte(str))
+	return hex.EncodeToString(md5Ctx.Sum(nil)), nil
+}
+
 // CopyFile 拷贝文件
 func CopyFile(dstName, srcName string) (written int64, err error) {
 	src, err := os.Open(srcName)
