@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -102,15 +103,12 @@ func GetRandomString(length int) string {
 }
 
 // PathExists 判断文件是否存在
-func PathExists(path string) (bool, error) {
+func PathExists(path string) bool {
 	_, err := os.Stat(path)
 	if err == nil {
-		return true, nil
+		return true
 	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
+	return false
 }
 
 // GetFileSize 获取文件大小
@@ -121,6 +119,19 @@ func GetFileSize(filename string) int64 {
 		return nil
 	})
 	return result
+}
+
+// WriteFile 写文件
+func WriteFile(fPath string, content string) error {
+	err := os.MkdirAll(path.Dir(fPath), os.ModePerm)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(fPath, []byte(content), 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetExt 根据文件名获取后缀

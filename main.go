@@ -313,6 +313,30 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:        "kstatus",
+				Usage:       "查看文件变更",
+				Description: "1. doc kstatus 比对本地仓库和工作区的知识点变更",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					StatusKn()
+					return nil
+				},
+			},
+			{
+				Name:        "kcheckout",
+				Usage:       "恢复本地仓库的指定文件到工作区",
+				Description: "1. doc kcheckout hash 从本地仓库恢复hash到工作区\n\r   2. doc kcheckout . 恢复本地仓库的全部文件到工作区",
+				ArgsUsage:   "[文件名]",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入知识点,命令行格式./doc kcheckout xx 支持点号")
+						return nil
+					}
+					CheckoutKN(c.Args().Get(0))
+					return nil
+				},
+			},
 		},
 	}
 
@@ -676,15 +700,15 @@ func Push() {
 }
 
 // getKNLocalVersion 获取知识点本地版本号
-func getKNLocalVersion(knowledge string) string {
-	versionPath := fmt.Sprintf("%s%s/version", knWorkPath, knowledge)
+func getKNLocalVersion(kName string) string {
+	versionPath := fmt.Sprintf("%s%s/version", knWorkPath, kName)
 	b, _ := ioutil.ReadFile(versionPath)
 	return string(b)
 }
 
 // kPull 远程拉取知识点
-func kPull(knowledge string) {
-	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=kget&token=%s&kname=%s", ServerHost, UserToken, knowledge), url.Values{})
+func kPull(kName string) {
+	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=kget&token=%s&kname=%s", ServerHost, UserToken, kName), url.Values{})
 	if err != nil {
 		log.Printf("拉取远程知识点异常:%s", err.Error())
 		return
@@ -706,82 +730,73 @@ func kPull(knowledge string) {
 		return
 	}
 
-	err = os.MkdirAll(knWorkPath+knowledge, os.ModePerm)
+	err = os.MkdirAll(knWorkPath+kName, os.ModePerm)
 	if err != nil {
 		log.Printf("创建知识点工作区目录异常:%s", err.Error())
 		return
 	}
 
-	// 刷进去历史版本文件
-	var remoteMaxV int
+	// 刷历史版本文件到本地
+	var maxV int
 	for _, v := range list {
-		knData, _ := v.(map[string]interface{})
-		version, _ := knData["version"].(string)
-		content, _ := knData["content"].(string)
-
-		v, _ := strconv.Atoi(version)
-		if v > remoteMaxV {
-			remoteMaxV = v
+		m, _ := v.(map[string]interface{})
+		ver, _ := m["version"].(string)
+		v, _ := strconv.Atoi(ver)
+		if v > maxV {
+			maxV = v
 		}
-
-		err = os.MkdirAll(fmt.Sprintf("%s%s/%s/", knWorkPath, knowledge, version), os.ModePerm)
-		if err != nil {
-			log.Printf("创建知识点工作区目录异常:%s", err.Error())
-			return
-		}
-		err = ioutil.WriteFile(fmt.Sprintf("%s%s/%s/%s.md", knWorkPath, knowledge, version, knowledge), []byte(content), 0644)
+		content, _ := m["content"].(string)
+		err = pkg.WriteFile(fmt.Sprintf("%s%s/%d/%s.md", knWorkPath, kName, v, kName), content)
 		if err != nil {
 			log.Printf("写入知识点文件异常:%s", err.Error())
 			return
 		}
 	}
 
-	knFilePath := fmt.Sprintf("%s/%s.md", knWorkPath, knowledge)
-	ok, _ = pkg.PathExists(knFilePath)
+	knFilePath := fmt.Sprintf("%s/%s.md", knWorkPath, kName)
+	ok = pkg.PathExists(knFilePath)
 	if ok {
-		localV, _ := strconv.Atoi(getKNLocalVersion(knowledge))
+		localV, _ := strconv.Atoi(getKNLocalVersion(kName))
 		nowV, _ := strconv.Atoi(nowVersion)
+		// 如果远程版本大于本地版本
 		if nowV > localV {
-			newVPath := fmt.Sprintf("%s%s/%d/%s.md", knWorkPath, knowledge, nowV, knowledge)
-			fileMd5, _ := pkg.GetFileMd5(newVPath)
-			ok, _ = pkg.PathExists(newVPath)
+			newVPath := fmt.Sprintf("%s%s/%d/%s.md", knWorkPath, kName, nowV, kName)
+			ok = pkg.PathExists(newVPath)
 			if ok {
-				knOldFilePath := fmt.Sprintf("%s/%s-old.md", knWorkPath, knowledge)
-				os.Rename(knFilePath, knOldFilePath)
-				pkg.CopyFile(fmt.Sprintf("%s/%s.md", knWorkPath, knowledge), newVPath)
-				pkg.CopyFile(repoObjPath+fileMd5, newVPath)
-				log.Printf("版本冲突，本地文件被重命名为:%s-old.md,版本号:%s", knowledge, nowVersion)
+				os.Rename(knFilePath, fmt.Sprintf("%s/%s-old.md", knWorkPath, kName))
+				pkg.CopyFile(knFilePath, newVPath)
+				log.Printf("版本冲突,本地文件被重命名为:%s-old.md,版本号:%s", kName, nowVersion)
 			} else {
-				// 大概率不会到这里来
-				log.Printf("拉取远程知识点成功:%s,最新版本未通过审核,本地不变更,版本号:%s", knowledge, nowVersion)
+				// 如果远程版本最新版未过审--概率很低
+				log.Printf("拉取远程知识点成功:%s,最新版本未通过审核,本地不变更,版本号:%s", kName, nowVersion)
 			}
 		} else {
-			log.Printf("拉取远程知识点成功:%s,本地无变更,版本号:%s", knowledge, nowVersion)
+			log.Printf("拉取远程知识点成功:%s,本地无变更,版本号:%s", kName, nowVersion)
 		}
 	} else {
-		log.Printf("拉取远程知识点成功:%s,版本号:%s", knowledge, nowVersion)
-		pkg.CopyFile(knFilePath, fmt.Sprintf("%s%s/%d/%s.md", knWorkPath, knowledge, remoteMaxV, knowledge))
+		log.Printf("拉取远程知识点成功:%s,版本号:%s", kName, nowVersion)
+		pkg.CopyFile(knFilePath, fmt.Sprintf("%s%s/%d/%s.md", knWorkPath, kName, maxV, kName))
 	}
 
-	// 本地版本号
-	err = ioutil.WriteFile(fmt.Sprintf("%s%s/version", knWorkPath, knowledge), []byte(nowVersion), 0644)
+	// 更新本地版本号
+	err = pkg.WriteFile(fmt.Sprintf("%s%s/version", knWorkPath, kName), nowVersion)
 	if err != nil {
 		log.Printf("写入知识点版本号异常:%s", err.Error())
 		return
 	}
 }
 
-// kPush 推到远程服务器
-func kPush(knowledge string) {
+// kPush 知识点推到远程服务器
+func kPush(kName string) {
 	localKNs, err := ReadKIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
 	}
 
-	knDes, ok := localKNs[knowledge]
+	knDes, ok := localKNs[kName]
 	if !ok {
-		log.Printf("本地仓库该知识点不存在:%s", knowledge)
+		log.Printf("本地仓库该知识点不存在:%s", kName)
 		return
 	}
 
@@ -793,7 +808,7 @@ func kPush(knowledge string) {
 
 	localV := getKNLocalVersion(knDes.KName)
 	if localV == "" {
-		log.Printf("提交异常,知识点本地版本号不存在:%s", knowledge)
+		log.Printf("提交异常,知识点本地版本号不存在:%s", kName)
 		return
 	}
 
@@ -811,7 +826,7 @@ func kPush(knowledge string) {
 	if err != nil {
 		if strings.Contains(err.Error(), "i1069") {
 			log.Printf("本地知识非最新,重新拉取中,知识点:%s", knDes.KName)
-			kPull(knowledge)
+			kPull(kName)
 			return
 		}
 
@@ -822,65 +837,65 @@ func kPush(knowledge string) {
 	log.Printf("知识点推到远程成功:%s", knDes.KName)
 }
 
-func kNew(knowledge string) {
+func kNew(kName string) {
 	form := url.Values{
 		"token": {UserToken},
-		"kname": {knowledge},
+		"kname": {kName},
 	}
 
 	url := fmt.Sprintf("%s/info/client?token=%s&action=knew", ServerHost, UserToken)
 	_, err := pkg.ClientCall(url, form)
 	if err != nil {
-		log.Printf("创建知识点异常:%s,知识点:%s", err.Error(), knowledge)
+		log.Printf("创建知识点异常:%s,知识点:%s", err.Error(), kName)
 		return
 	}
 }
 
-func krel(knowledge string, rel string) {
+func krel(kName string, rel string) {
 	form := url.Values{
 		"token":     {UserToken},
-		"kname":     {knowledge},
+		"kname":     {kName},
 		"like_name": {rel},
 	}
 
 	url := fmt.Sprintf("%s/info/client?token=%s&action=krel", ServerHost, UserToken)
 	_, err := pkg.ClientCall(url, form)
 	if err != nil {
-		log.Printf("创建知识点别名异常:%s,知识点:%s", err.Error(), knowledge)
+		log.Printf("创建知识点别名异常:%s,知识点:%s", err.Error(), kName)
 		return
 	}
 }
 
 // kAdd 文件工作区加入到本地仓库
-func kAdd(Knowledge string, changelog string) {
+func kAdd(kName string, changelog string) {
 	localKN, err := ReadKIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
 	}
 
-	knPath := fmt.Sprintf("%s%s.md", knWorkPath, Knowledge)
-	ok, _ := pkg.PathExists(knPath)
+	knPath := fmt.Sprintf("%s%s.md", knWorkPath, kName)
+	ok := pkg.PathExists(knPath)
 	if !ok {
-		log.Printf("该知识点文件不存在,知识点:%s", Knowledge)
+		log.Printf("该知识点文件不存在,知识点:%s", kName)
 		return
 	}
 
 	err = replaceImg(knPath)
 	if err != nil {
-		log.Printf("图片替换异常,err:%s,文件名:%s", err.Error(), Knowledge)
+		log.Printf("图片替换异常,err:%s,文件名:%s", err.Error(), kName)
 		return
 	}
 
 	fileMd5, err := pkg.GetFileMd5(knPath)
 	if err != nil {
-		log.Printf("获取文件md5异常,err:%s,知识点:%s", err.Error(), Knowledge)
+		log.Printf("获取文件md5异常,err:%s,知识点:%s", err.Error(), kName)
 		return
 	}
 
-	knDes := localKN[Knowledge]
+	knDes := localKN[kName]
 	if knDes == nil {
-		knDes = &KnowledgeDesc{KName: Knowledge}
+		knDes = &KnowledgeDesc{KName: kName}
 	} else {
 		if knDes.Md5 == fileMd5 {
 			return
@@ -959,8 +974,8 @@ func NewDoc(fileName string) {
 		return
 	}
 
-	exist, _ := pkg.PathExists(workPostsPath + fileName)
-	if exist {
+	ok := pkg.PathExists(workPostsPath + fileName)
+	if ok {
 		log.Printf("文件已经存在,文件:%s", fileName)
 		return
 	}
@@ -1060,12 +1075,8 @@ func doAdd(fileName string) {
 		return
 	}
 
-	exist, err := pkg.PathExists(workPostsPath + fileName)
-	if err != nil {
-		log.Printf("判断文件是否存在异常,err:%s,文件名:%s", err.Error(), fileName)
-		return
-	}
-	if !exist {
+	ok = pkg.PathExists(workPostsPath + fileName)
+	if !ok {
 		log.Printf("该文件不存在,文件名:%s", fileName)
 		return
 	}
@@ -1207,9 +1218,75 @@ func Status() {
 	}
 
 	for _, v := range localRepoPosts {
-		b, _ := pkg.PathExists(workPostsPath + v.FileName)
+		b := pkg.PathExists(workPostsPath + v.FileName)
 		if !b && v.Status != "-2" && v.Status != "-3" {
 			log.Printf("文件被删除:%s", v.FileName)
+		}
+	}
+}
+
+// StatusKn 本地工作区和本地repo的差异
+func StatusKn() {
+	localKNs, err := ReadKIndex()
+	if err != nil {
+		log.Printf("读取本地仓库异常:%s", err.Error())
+		return
+	}
+
+	files, err := ioutil.ReadDir(knWorkPath)
+	for _, s := range files {
+		if s.IsDir() || inIgnoreList(s.Name()) {
+			continue
+		}
+		if !strings.Contains(s.Name(), ".md") {
+			continue
+		}
+
+		kName := s.Name()[:strings.Index(s.Name(), ".")]
+		v, ok := localKNs[kName]
+		if !ok {
+			log.Printf("存在新知识点:%s", kName)
+			continue
+		}
+
+		md5, err := pkg.GetFileMd5(knWorkPath + s.Name())
+		if err != nil {
+			log.Printf("获取md5异常:%s,文件名:%s", err.Error(), s.Name())
+			continue
+		}
+		if md5 != v.Md5 {
+			log.Printf("存在变更知识点:%s", v.KName)
+		}
+	}
+}
+
+// CheckoutKN 签出文件
+func CheckoutKN(kName string) {
+	localKNs, err := ReadKIndex()
+	if err != nil {
+		log.Printf("读取本地仓库异常:%s", err.Error())
+		return
+	}
+
+	if kName == "." {
+		for _, v := range localKNs {
+			_, err = pkg.CopyFile(knWorkPath+v.KName+".md", repoObjPath+v.Md5)
+			if err != nil {
+				log.Printf("拷贝文件异常:%s,知识点:%s", err.Error(), v.KName)
+				return
+			}
+		}
+	} else {
+		v, ok := localKNs[kName]
+		if !ok {
+			log.Printf("未匹配到任何文件,知识点:%s", kName)
+			return
+		}
+
+		_, err = pkg.CopyFile(knWorkPath+v.KName+".md", repoObjPath+v.Md5)
+		if err != nil {
+			log.Printf("拷贝文件异常:%s,文件名:%s", err.Error(), v.KName)
+			return
 		}
 	}
 }
