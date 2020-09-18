@@ -12,9 +12,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"z_tools/pkg"
 	"z_tools/pkg/qiniu"
 )
+
+type Doc struct {}
 
 var (
 	ServerHost = "http://z.jiaoliuqu.com"
@@ -59,13 +62,13 @@ func init() {
 }
 
 // ReadToken 读取用户token
-func ReadToken() string {
+func (d *Doc) ReadToken() string {
 	b, _ := ioutil.ReadFile(tokenPath)
 	return string(b)
 }
 
 // ReadEnv 读取环境变量
-func ReadEnv() string {
+func (d *Doc) ReadEnv() string {
 	b, _ := ioutil.ReadFile(envPath)
 	return string(b)
 }
@@ -94,7 +97,7 @@ func getUploadToken(key string) (string, error) {
 }
 
 // InitDoc 初始化
-func InitDoc(token string, env string) {
+func (d *Doc) InitDoc(token string, env string) {
 	err := ioutil.WriteFile(tokenPath, []byte(token), 0644)
 	if err != nil {
 		log.Printf("初始化token异常:%s", err.Error())
@@ -105,16 +108,18 @@ func InitDoc(token string, env string) {
 		log.Printf("初始化env异常:%s", err.Error())
 		return
 	}
-	WriteUpdateTime()
+	d.WriteUpdateTime()
 	log.Printf("初始化成功")
 }
 
-func ReadDocEnv() {
-	env = ReadEnv()
+// ReadDocEnv 读取环境配置
+func (d *Doc) ReadDocEnv() {
+	env = d.ReadEnv()
 	if env == "test" {
 		ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	}
-	UserToken = ReadToken()
+
+	UserToken = d.ReadToken()
 
 	// 用户token校验
 	if len(os.Args) >= 2 && os.Args[1] != "init" && UserToken == "" {
@@ -122,34 +127,34 @@ func ReadDocEnv() {
 		return
 	}
 
-	autoUpdate()
+	d.autoUpdate()
 }
 
 // autoUpdate 自动升级
-func autoUpdate() {
-	lastUpdate, _ := strconv.Atoi(ReadUpdateTime())
+func (d *Doc) autoUpdate() {
+	lastUpdate, _ := strconv.Atoi(d.ReadUpdateTime())
 	if int(time.Now().Unix())-lastUpdate < 86400 {
 		return
 	}
 
-	WriteUpdateTime()
-	Update(true)
+	d.WriteUpdateTime()
+	d.Update(true)
 }
 
 // ReadUpdateTime 读取安装时间
-func ReadUpdateTime() string {
+func (d *Doc) ReadUpdateTime() string {
 	b, _ := ioutil.ReadFile(updatePath)
 	return string(b)
 }
 
 // WriteUpdateTime 刷新安装时间
-func WriteUpdateTime() {
+func (d *Doc) WriteUpdateTime() {
 	ioutil.WriteFile(updatePath, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644)
 	return
 }
 
 // getRemoteVersion 获取服务器版本号
-func getRemoteVersion() (string, error) {
+func (d *Doc) getRemoteVersion() (string, error) {
 	data, err := pkg.ClientCall(ServerHost+"/info/client?action=version&token="+UserToken, url.Values{})
 	if err != nil {
 		return "", err
@@ -172,15 +177,15 @@ func getRemoteVersion() (string, error) {
 }
 
 // Update 版本升级
-func Update(auto bool) {
-	remoteV, err := getRemoteVersion()
+func (d *Doc) Update(auto bool) {
+	remoteV, err := d.getRemoteVersion()
 	if err != nil {
 		log.Printf("获取版本号异常:%s", err.Error())
 		return
 	}
 
 	// 更新时间
-	WriteUpdateTime()
+	d.WriteUpdateTime()
 
 	// 判断是否需要升级版本
 	if !pkg.VersionCompare(remoteV, Version) {
@@ -243,7 +248,7 @@ func Update(auto bool) {
 }
 
 // Update2Ser 更新版本到服务器
-func Update2Ser(version string) {
+func (d *Doc) Update2Ser(version string) {
 	fileNameMac := "doc_" + version
 	token, err := getUploadToken(fileNameMac)
 	if err != nil {
@@ -281,7 +286,7 @@ func Update2Ser(version string) {
 }
 
 // UpdateInstallShell 更新安装脚本
-func UpdateInstallShell() {
+func (d *Doc) UpdateInstallShell() {
 	installMac := "install.sh"
 
 	token, err := getUploadToken(installMac)

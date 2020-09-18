@@ -5,9 +5,9 @@ import (
 	"os"
 	"sort"
 
-	"z_tools/internal/doc"
-
 	"github.com/urfave/cli/v2"
+
+	"z_tools/internal/doc"
 )
 
 func main() {
@@ -35,93 +35,8 @@ func main() {
 					if c.NArg() >= 2 {
 						env = c.Args().Get(1)
 					}
-					doc.InitDoc(c.Args().Get(0), env)
-					return nil
-				},
-			},
-			{
-				Name:        "new",
-				Usage:       "新建文章",
-				Description: "1. doc new test 本地自动生成一篇test.md的空文档",
-				ArgsUsage:   "[文件名]",
-				Action: func(c *cli.Context) error {
-					if c.NArg() < 1 {
-						log.Printf("请输入文件名,命令行格式./doc new xx")
-						return nil
-					}
-					doc.NewDoc(c.Args().Get(0))
-					return nil
-				},
-			},
-			{
-				Name:        "add",
-				Usage:       "提交到本地仓库",
-				Description: "1. doc add test.md 提交test.md到本地仓库\n\r   2. doc add . 提交工作区的全部文件到本地仓库",
-				ArgsUsage:   "[文件名]",
-				Action: func(c *cli.Context) error {
-					if c.NArg() < 1 {
-						log.Printf("请输入文件名,命令行格式./doc add xx.md")
-						return nil
-					}
-					doc.Add(c.Args().Get(0))
-					return nil
-				},
-			},
-			{
-				Name:        "pull",
-				Usage:       "拉取文章列表",
-				Description: "1. doc pull 从服务器拉取最新文章列表到本地",
-				ArgsUsage:   " ",
-				Action: func(c *cli.Context) error {
-					doc.Pull()
-					return nil
-				},
-			},
-			{
-				Name:        "push",
-				Usage:       "提交到服务器",
-				Description: "1. doc push 把本地仓库变更提交到服务器",
-				ArgsUsage:   " ",
-				Action: func(c *cli.Context) error {
-					doc.Push()
-					return nil
-				},
-			},
-			{
-				Name:        "rm",
-				Usage:       "删除文件",
-				Description: "1. doc rm test.md 把test.md从本地仓库移除",
-				ArgsUsage:   "[文件名]",
-				Action: func(c *cli.Context) error {
-					if c.NArg() < 1 {
-						log.Printf("请输入文件名,命令行格式./doc rm xx.md")
-						return nil
-					}
-					doc.Rm(c.Args().Get(0))
-					return nil
-				},
-			},
-			{
-				Name:        "status",
-				Usage:       "查看文件变更",
-				Description: "1. doc status 比对本地仓库和工作区的文件变更",
-				ArgsUsage:   " ",
-				Action: func(c *cli.Context) error {
-					doc.Status()
-					return nil
-				},
-			},
-			{
-				Name:        "checkout",
-				Usage:       "恢复本地仓库的指定文件到工作区",
-				Description: "1. doc checkout test.md 从本地仓库恢复test.md到工作区\n\r   2. doc checkout . 恢复本地仓库的全部文件到工作区",
-				ArgsUsage:   "[文件名]",
-				Action: func(c *cli.Context) error {
-					if c.NArg() < 1 {
-						log.Printf("请输入文件名,命令行格式./doc checkout xx.md 支持点号")
-						return nil
-					}
-					doc.Checkout(c.Args().Get(0))
+					d := &doc.Doc{}
+					d.InitDoc(c.Args().Get(0), env)
 					return nil
 				},
 			},
@@ -131,7 +46,8 @@ func main() {
 				Description: "1. doc update 升级程序版本",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					doc.Update(false)
+					d := &doc.Doc{}
+					d.Update(false)
 					return nil
 				},
 			},
@@ -145,7 +61,8 @@ func main() {
 						log.Printf("请输入版本号")
 						return nil
 					}
-					doc.Update2Ser(c.Args().Get(0))
+					d := &doc.Doc{}
+					d.Update2Ser(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -155,7 +72,101 @@ func main() {
 				Description: "1. doc updateInstall",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					doc.UpdateInstallShell()
+					d := &doc.Doc{}
+					d.UpdateInstallShell()
+					return nil
+				},
+			},
+			{
+				Name:        "new",
+				Usage:       "新建文章",
+				Description: "1. doc new test 本地自动生成一篇test.md的空文档",
+				ArgsUsage:   "[文件名]",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入文件名,命令行格式./doc new xx")
+						return nil
+					}
+					d := &doc.PostManger{}
+					d.NewDoc(c.Args().Get(0))
+					return nil
+				},
+			},
+			{
+				Name:        "add",
+				Usage:       "提交到本地仓库",
+				Description: "1. doc add test.md 提交test.md到本地仓库\n\r   2. doc add . 提交工作区的全部文件到本地仓库",
+				ArgsUsage:   "[文件名]",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入文件名,命令行格式./doc add xx.md")
+						return nil
+					}
+					d := &doc.PostManger{}
+					d.Add(c.Args().Get(0))
+					return nil
+				},
+			},
+			{
+				Name:        "pull",
+				Usage:       "拉取文章列表",
+				Description: "1. doc pull 从服务器拉取最新文章列表到本地",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					d := &doc.PostManger{}
+					d.Pull()
+					return nil
+				},
+			},
+			{
+				Name:        "push",
+				Usage:       "提交到服务器",
+				Description: "1. doc push 把本地仓库变更提交到服务器",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					d := &doc.PostManger{}
+					d.Push()
+					return nil
+				},
+			},
+			{
+				Name:        "rm",
+				Usage:       "删除文件",
+				Description: "1. doc rm test.md 把test.md从本地仓库移除",
+				ArgsUsage:   "[文件名]",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入文件名,命令行格式./doc rm xx.md")
+						return nil
+					}
+					d := &doc.PostManger{}
+					d.Rm(c.Args().Get(0))
+					return nil
+				},
+			},
+			{
+				Name:        "status",
+				Usage:       "查看文件变更",
+				Description: "1. doc status 比对本地仓库和工作区的文件变更",
+				ArgsUsage:   " ",
+				Action: func(c *cli.Context) error {
+					d := &doc.PostManger{}
+					d.Status()
+					return nil
+				},
+			},
+			{
+				Name:        "checkout",
+				Usage:       "恢复本地仓库的指定文件到工作区",
+				Description: "1. doc checkout test.md 从本地仓库恢复test.md到工作区\n\r   2. doc checkout . 恢复本地仓库的全部文件到工作区",
+				ArgsUsage:   "[文件名]",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 1 {
+						log.Printf("请输入文件名,命令行格式./doc checkout xx.md 支持点号")
+						return nil
+					}
+					d := &doc.PostManger{}
+					d.Checkout(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -169,14 +180,15 @@ func main() {
 						log.Printf("请输入知识点")
 						return nil
 					}
-					doc.KPull(c.Args().Get(0))
+					k := &doc.KnowledgeManager{}
+					k.KPull(c.Args().Get(0))
 					return nil
 				},
 			},
 			{
 				Name:        "kadd",
-				Usage:       "提交知识点更新到本地",
-				Description: "1. doc kadd xx 要提交的知识点",
+				Usage:       "提交知识点到本地仓库",
+				Description: "1. doc kadd xx yy 参数1:提交的知识点,参数2:修改日志)",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
@@ -188,7 +200,8 @@ func main() {
 						log.Printf("请输入修改日志")
 						return nil
 					}
-					doc.KAdd(c.Args().Get(0), c.Args().Get(1))
+					k := &doc.KnowledgeManager{}
+					k.KAdd(c.Args().Get(0), c.Args().Get(1))
 					return nil
 				},
 			},
@@ -202,7 +215,8 @@ func main() {
 						log.Printf("请输入知识点")
 						return nil
 					}
-					doc.KPush(c.Args().Get(0))
+					k := &doc.KnowledgeManager{}
+					k.KPush(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -216,14 +230,15 @@ func main() {
 						log.Printf("请输入知识点")
 						return nil
 					}
-					doc.KNew(c.Args().Get(0))
+					k := &doc.KnowledgeManager{}
+					k.KNew(c.Args().Get(0))
 					return nil
 				},
 			},
 			{
-				Name:        " krel",
+				Name:        "krel",
 				Usage:       "给知识点创建别名",
-				Description: "1. doc  krel xx 知识点 别名",
+				Description: "1. doc krel xx 知识点 别名",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
@@ -234,23 +249,25 @@ func main() {
 						log.Printf("请输入别名")
 						return nil
 					}
-					doc.Krel(c.Args().Get(0), c.Args().Get(1))
+					k := &doc.KnowledgeManager{}
+					k.Krel(c.Args().Get(0), c.Args().Get(1))
 					return nil
 				},
 			},
 			{
 				Name:        "kstatus",
-				Usage:       "查看文件变更",
+				Usage:       "查看知识点变更",
 				Description: "1. doc kstatus 比对本地仓库和工作区的知识点变更",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					doc.StatusKn()
+					k := &doc.KnowledgeManager{}
+					k.StatusKn()
 					return nil
 				},
 			},
 			{
 				Name:        "kcheckout",
-				Usage:       "恢复本地仓库的指定文件到工作区",
+				Usage:       "恢复本地仓库的指定知识点到工作区",
 				Description: "1. doc kcheckout hash 从本地仓库恢复hash到工作区\n\r   2. doc kcheckout . 恢复本地仓库的全部文件到工作区",
 				ArgsUsage:   "[文件名]",
 				Action: func(c *cli.Context) error {
@@ -258,7 +275,8 @@ func main() {
 						log.Printf("请输入知识点,命令行格式./doc kcheckout xx 支持点号")
 						return nil
 					}
-					doc.CheckoutKN(c.Args().Get(0))
+					k := &doc.KnowledgeManager{}
+					k.CheckoutKN(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -268,7 +286,8 @@ func main() {
 	sort.Sort(cli.FlagsByName(app.Flags))
 	sort.Sort(cli.CommandsByName(app.Commands))
 
-	doc.ReadDocEnv()
+	d := &doc.Doc{}
+	d.ReadDocEnv()
 
 	err := app.Run(os.Args)
 	if err != nil {

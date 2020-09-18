@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"z_tools/pkg"
 	"z_tools/pkg/qiniu"
 )
@@ -21,6 +22,9 @@ const (
 	StatusUserDel = "-2" // 用户删除
 	StatusAdmDel  = "-3" // 管理员删除
 )
+
+type PostManger struct {
+}
 
 // PostDesc 文章描述
 type PostDesc struct {
@@ -31,7 +35,7 @@ type PostDesc struct {
 }
 
 // WriteIndex 写入索引
-func WriteIndex(m map[string]*PostDesc) error {
+func (p *PostManger) WriteIndex(m map[string]*PostDesc) error {
 	var list []*PostDesc
 	for _, v := range m {
 		list = append(list, v)
@@ -52,7 +56,7 @@ func WriteIndex(m map[string]*PostDesc) error {
 }
 
 // ReadIndex 读取索引
-func ReadIndex() (map[string]*PostDesc, error) {
+func (p *PostManger) ReadIndex() (map[string]*PostDesc, error) {
 	m := make(map[string]*PostDesc)
 
 	b, _ := ioutil.ReadFile(indexPath)
@@ -73,8 +77,8 @@ func ReadIndex() (map[string]*PostDesc, error) {
 }
 
 // Push 推到远程服务器
-func Push() {
-	localRepoPosts, err := ReadIndex()
+func (p *PostManger) Push() {
+	localRepoPosts, err := p.ReadIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
@@ -114,7 +118,7 @@ func Push() {
 			localRepoPosts[p.FileName] = &p
 		}
 	}
-	WriteIndex(localRepoPosts)
+	p.WriteIndex(localRepoPosts)
 
 	for _, v := range localRepoPosts {
 		r, ok := remotePosts[v.FileName]
@@ -177,8 +181,8 @@ func Push() {
 }
 
 // Pull 拉取远程
-func Pull() {
-	localRepoPosts, err := ReadIndex()
+func (p *PostManger) Pull() {
+	localRepoPosts, err := p.ReadIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
@@ -270,11 +274,11 @@ func Pull() {
 		log.Printf("拉取远程文章成功:%s", remote.FileName)
 	}
 
-	WriteIndex(localRepoPosts)
+	p.WriteIndex(localRepoPosts)
 }
 
 // NewDoc 新建文件
-func NewDoc(fileName string) {
+func (p *PostManger) NewDoc(fileName string) {
 	l, err := getCategory()
 	fmt.Println()
 	fmt.Println(fmt.Sprintf("    选择你文章的分类(单选),目前支持的分类如下:"))
@@ -347,7 +351,7 @@ category: %s
 }
 
 // Add 文件工作区加入到本地仓库
-func Add(fileName string) {
+func (p *PostManger) Add(fileName string) {
 	if fileName == "." {
 		files, err := ioutil.ReadDir(workPostsPath)
 		if err != nil {
@@ -358,17 +362,17 @@ func Add(fileName string) {
 			if s.IsDir() || inIgnoreList(s.Name()) {
 				continue
 			}
-			doAdd(s.Name())
+			p.doAdd(s.Name())
 		}
 	} else {
-		doAdd(fileName)
+		p.doAdd(fileName)
 	}
 	return
 }
 
 // Rm 删除文件
-func Rm(fileName string) {
-	localRepoPosts, err := ReadIndex()
+func (p *PostManger) Rm(fileName string) {
+	localRepoPosts, err := p.ReadIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
@@ -398,13 +402,13 @@ func Rm(fileName string) {
 	os.Remove(repoObjPath + local.Md5)
 	localRepoPosts[local.FileName] = local
 
-	WriteIndex(localRepoPosts)
+	p.WriteIndex(localRepoPosts)
 	return
 }
 
 // Add 文件工作区加入到本地仓库
-func doAdd(fileName string) {
-	localRepoPosts, err := ReadIndex()
+func (p *PostManger) doAdd(fileName string) {
+	localRepoPosts, err := p.ReadIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
@@ -489,14 +493,14 @@ category: 文章分类
 		log.Printf("写入索引异常:%s", err.Error())
 	}
 	log.Printf("文章提交到本地仓库成功:%s", fileName)
-	WriteIndex(localRepoPosts)
+	p.WriteIndex(localRepoPosts)
 
 	return
 }
 
 // Checkout 从本地repo迁出到工作区
-func Checkout(fileName string) {
-	localRepoPosts, err := ReadIndex()
+func (p *PostManger) Checkout(fileName string) {
+	localRepoPosts, err := p.ReadIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
@@ -539,8 +543,8 @@ func Checkout(fileName string) {
 }
 
 // Status 本地工作区和本地repo的差异
-func Status() {
-	localRepoPosts, err := ReadIndex()
+func (p *PostManger) Status() {
+	localRepoPosts, err := p.ReadIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return

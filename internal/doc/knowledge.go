@@ -14,6 +14,9 @@ import (
 	"z_tools/pkg"
 )
 
+type KnowledgeManager struct {
+}
+
 // KnowledgeDesc 知识点描述
 type KnowledgeDesc struct {
 	KName      string `json:"kName"`       // 知识点名称
@@ -23,7 +26,7 @@ type KnowledgeDesc struct {
 }
 
 // ReadKIndex 读取知识点索引
-func ReadKIndex() (map[string]*KnowledgeDesc, error) {
+func (k *KnowledgeManager) ReadKIndex() (map[string]*KnowledgeDesc, error) {
 	m := make(map[string]*KnowledgeDesc)
 
 	b, _ := ioutil.ReadFile(kIndexPath)
@@ -44,7 +47,7 @@ func ReadKIndex() (map[string]*KnowledgeDesc, error) {
 }
 
 // WriteKIndex 写入知识点索引
-func WriteKIndex(m map[string]*KnowledgeDesc) error {
+func (k *KnowledgeManager) WriteKIndex(m map[string]*KnowledgeDesc) error {
 	var list []*KnowledgeDesc
 	for _, v := range m {
 		list = append(list, v)
@@ -65,14 +68,14 @@ func WriteKIndex(m map[string]*KnowledgeDesc) error {
 }
 
 // getKNLocalVersion 获取知识点本地版本号
-func getKNLocalVersion(kName string) string {
+func (k *KnowledgeManager) getKNLocalVersion(kName string) string {
 	versionPath := fmt.Sprintf("%s%s/version", knWorkPath, kName)
 	b, _ := ioutil.ReadFile(versionPath)
 	return string(b)
 }
 
 // KPull 远程拉取知识点
-func KPull(kName string) {
+func (k *KnowledgeManager) KPull(kName string) {
 	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=kget&token=%s&kname=%s", ServerHost, UserToken, kName), url.Values{})
 	if err != nil {
 		log.Printf("拉取远程知识点异常:%s", err.Error())
@@ -121,7 +124,7 @@ func KPull(kName string) {
 	knFilePath := fmt.Sprintf("%s/%s.md", knWorkPath, kName)
 	ok = pkg.PathExists(knFilePath)
 	if ok {
-		localV, _ := strconv.Atoi(getKNLocalVersion(kName))
+		localV, _ := strconv.Atoi(k.getKNLocalVersion(kName))
 		nowV, _ := strconv.Atoi(nowVersion)
 		// 如果远程版本大于本地版本
 		if nowV > localV {
@@ -152,8 +155,8 @@ func KPull(kName string) {
 }
 
 // KPush 知识点推到远程服务器
-func KPush(kName string) {
-	localKNs, err := ReadKIndex()
+func (k *KnowledgeManager) KPush(kName string) {
+	localKNs, err := k.ReadKIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
@@ -171,7 +174,7 @@ func KPush(kName string) {
 		return
 	}
 
-	localV := getKNLocalVersion(knDes.KName)
+	localV := k.getKNLocalVersion(knDes.KName)
 	if localV == "" {
 		log.Printf("提交异常,知识点本地版本号不存在:%s", kName)
 		return
@@ -191,7 +194,7 @@ func KPush(kName string) {
 	if err != nil {
 		if strings.Contains(err.Error(), "i1069") {
 			log.Printf("本地知识非最新,重新拉取中,知识点:%s", knDes.KName)
-			KPull(kName)
+			k.KPull(kName)
 			return
 		}
 
@@ -202,7 +205,7 @@ func KPush(kName string) {
 	log.Printf("知识点推到远程成功:%s", knDes.KName)
 }
 
-func KNew(kName string) {
+func (k *KnowledgeManager) KNew(kName string) {
 	form := url.Values{
 		"token": {UserToken},
 		"kname": {kName},
@@ -216,7 +219,7 @@ func KNew(kName string) {
 	}
 }
 
-func Krel(kName string, rel string) {
+func (k *KnowledgeManager) Krel(kName string, rel string) {
 	form := url.Values{
 		"token":     {UserToken},
 		"kname":     {kName},
@@ -231,9 +234,9 @@ func Krel(kName string, rel string) {
 	}
 }
 
-// KAdd 文件工作区加入到本地仓库
-func KAdd(kName string, changelog string) {
-	localKN, err := ReadKIndex()
+// KAdd 把在工作区的知识点加入到本地仓库
+func (k *KnowledgeManager) KAdd(kName string, changelog string) {
+	localKN, err := k.ReadKIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
@@ -283,13 +286,13 @@ func KAdd(kName string, changelog string) {
 		return
 	}
 	log.Printf("知识点提交到本地仓库成功:%s", knDes.KName)
-	WriteKIndex(localKN)
+	k.WriteKIndex(localKN)
 	return
 }
 
 // StatusKn 本地工作区和本地repo的差异
-func StatusKn() {
-	localKNs, err := ReadKIndex()
+func (k *KnowledgeManager) StatusKn() {
+	localKNs, err := k.ReadKIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
@@ -323,8 +326,8 @@ func StatusKn() {
 }
 
 // CheckoutKN 签出文件
-func CheckoutKN(kName string) {
-	localKNs, err := ReadKIndex()
+func (k *KnowledgeManager) CheckoutKN(kName string) {
+	localKNs, err := k.ReadKIndex()
 	if err != nil {
 		log.Printf("读取本地仓库异常:%s", err.Error())
 		return
