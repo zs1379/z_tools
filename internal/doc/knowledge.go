@@ -156,7 +156,11 @@ func (k *KnowledgeManager) KPull(kName string) {
 		}
 	} else {
 		log.Printf("拉取远程知识点成功:%s,版本号:%s", kName, nowVersion)
-		pkg.CopyFile(knFilePath, fmt.Sprintf("%s%s/%d/%s.md", knWorkPath, kName, maxV, kName))
+		if maxV > 0 {
+			pkg.CopyFile(knFilePath, fmt.Sprintf("%s%s/%d/%s.md", knWorkPath, kName, maxV, kName))
+		} else {
+			pkg.WriteFile(knFilePath,"")
+		}
 	}
 
 	// 更新本地版本号
@@ -188,11 +192,6 @@ func (k *KnowledgeManager) KPush(kName string) {
 	}
 
 	localV := k.getKNLocalVersion(knDes.KName)
-	if localV == "" {
-		log.Printf("提交异常,知识点本地版本号不存在:%s", kName)
-		return
-	}
-
 	content := string(b)
 	form := url.Values{
 		"change_log":   {knDes.Changelog},
@@ -228,6 +227,25 @@ func (k *KnowledgeManager) KNew(kName string) {
 	_, err := pkg.ClientCall(url, form)
 	if err != nil {
 		log.Printf("创建知识点异常:%s,知识点:%s", err.Error(), kName)
+		return
+	}
+	err = os.MkdirAll(knWorkPath+kName, os.ModePerm)
+	if err != nil {
+		log.Printf("创建知识点工作区目录异常:%s", err.Error())
+		return
+	}
+
+	knFilePath := fmt.Sprintf("%s/%s.md", knWorkPath, kName)
+	err = pkg.WriteFile(knFilePath,"")
+	if err != nil {
+		log.Printf("创建知识点工作区文件异常:%s", err.Error())
+		return
+	}
+
+	versionPath := fmt.Sprintf("%s%s/version", knWorkPath, kName)
+	err = pkg.WriteFile(versionPath,"")
+	if err != nil {
+		log.Printf("写入知识点工作区版本号文件异常:%s", err.Error())
 		return
 	}
 }

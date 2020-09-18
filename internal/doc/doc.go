@@ -18,13 +18,8 @@ import (
 	"z_tools/pkg/qiniu"
 )
 
-type Doc struct {
-	UserToken  string // 用户token
-	ServerHost string
-}
-
 var (
-	Version = "0.1.12"
+	Version = "0.1.13"
 )
 
 var (
@@ -38,6 +33,11 @@ var (
 	workPostsPath = "./posts/"
 	knWorkPath    = "./knowledge/"
 )
+
+type Doc struct {
+	UserToken  string // 用户token
+	ServerHost string
+}
 
 func NewDoc() (*Doc, error) {
 	d := &Doc{}
@@ -134,17 +134,6 @@ func (d *Doc) InitDoc(token string, env string) {
 	log.Printf("初始化成功")
 }
 
-// autoUpdate 自动升级
-func (d *Doc) autoUpdate() {
-	lastUpdate, _ := strconv.Atoi(d.ReadUpdateTime())
-	if int(time.Now().Unix())-lastUpdate < 86400 {
-		return
-	}
-
-	d.WriteUpdateTime()
-	d.Update(true)
-}
-
 // ReadUpdateTime 读取安装时间
 func (d *Doc) ReadUpdateTime() string {
 	b, _ := ioutil.ReadFile(updatePath)
@@ -155,6 +144,17 @@ func (d *Doc) ReadUpdateTime() string {
 func (d *Doc) WriteUpdateTime() {
 	ioutil.WriteFile(updatePath, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644)
 	return
+}
+
+// autoUpdate 自动升级
+func (d *Doc) autoUpdate() {
+	lastUpdate, _ := strconv.Atoi(d.ReadUpdateTime())
+	if int(time.Now().Unix())-lastUpdate < 86400 {
+		return
+	}
+
+	d.WriteUpdateTime()
+	d.Update(true)
 }
 
 // getRemoteVersion 获取服务器版本号
