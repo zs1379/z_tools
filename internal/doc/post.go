@@ -9,13 +9,11 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"z_tools/pkg"
-	"z_tools/pkg/qiniu"
 )
 
 const (
@@ -24,6 +22,19 @@ const (
 )
 
 type PostManger struct {
+	*Doc
+}
+
+func NewPostManger() (*PostManger, error) {
+	d, err := NewDoc()
+	if err != nil {
+		return nil, err
+	}
+
+	p := &PostManger{
+		Doc: d,
+	}
+	return p, nil
 }
 
 // PostDesc 文章描述
@@ -84,7 +95,7 @@ func (p *PostManger) Push() {
 		return
 	}
 
-	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken), url.Values{})
+	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", p.ServerHost, p.UserToken), url.Values{})
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
@@ -130,7 +141,7 @@ func (p *PostManger) Push() {
 			// 删除远程文件
 			if v.Status == StatusUserDel && r.Status != StatusUserDel {
 				form := url.Values{"filename": {v.FileName}}
-				url := fmt.Sprintf("%s/info/client?token=%s&action=delete", ServerHost, UserToken)
+				url := fmt.Sprintf("%s/info/client?token=%s&action=delete", p.ServerHost, p.UserToken)
 				_, err = pkg.ClientCall(url, form)
 				if err != nil {
 					log.Printf("删除远程文章异常:%s,文章:%s", err.Error(), v.FileName)
@@ -161,7 +172,7 @@ func (p *PostManger) Push() {
 		content := string(b)
 		form := url.Values{
 			"filename":   {v.FileName},
-			"token":      {UserToken},
+			"token":      {p.UserToken},
 			"md5":        {v.Md5},
 			"content":    {content},
 			"title":      {title},
@@ -169,7 +180,7 @@ func (p *PostManger) Push() {
 			"updateTime": {v.UpdateTime},
 		}
 
-		url := fmt.Sprintf("%s/info/client?token=%s&action=add", ServerHost, UserToken)
+		url := fmt.Sprintf("%s/info/client?token=%s&action=add", p.ServerHost, p.UserToken)
 		_, err = pkg.ClientCall(url, form)
 		if err != nil {
 			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
@@ -188,7 +199,7 @@ func (p *PostManger) Pull() {
 		return
 	}
 
-	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", ServerHost, UserToken), url.Values{})
+	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=getList&token=%s", p.ServerHost, p.UserToken), url.Values{})
 	if err != nil {
 		log.Printf("拉取远程文章列表异常:%s", err.Error())
 		return
@@ -241,7 +252,7 @@ func (p *PostManger) Pull() {
 		}
 
 		form := url.Values{"filename": {remote.FileName}}
-		retData, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?token=%s&action=get", ServerHost, UserToken), form)
+		retData, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?token=%s&action=get", p.ServerHost, p.UserToken), form)
 		if err != nil {
 			log.Printf("拉取文章详情异常:%s,文章:%s", err.Error(), remote.FileName)
 			continue
@@ -279,7 +290,7 @@ func (p *PostManger) Pull() {
 
 // NewDoc 新建文件
 func (p *PostManger) NewDoc(fileName string) {
-	l, err := getCategory()
+	l, err := p.getCategory()
 	fmt.Println()
 	fmt.Println(fmt.Sprintf("    选择你文章的分类(单选),目前支持的分类如下:"))
 
@@ -441,7 +452,7 @@ func (p *PostManger) doAdd(fileName string) {
 		return
 	}
 
-	err = replaceImg(workPostsPath + fileName)
+	err = p.replaceImg(workPostsPath + fileName)
 	if err != nil {
 		log.Printf("图片替换异常,err:%s,文件名:%s", err.Error(), fileName)
 		return
@@ -457,7 +468,7 @@ category: 文章分类
 		fmt.Println()
 		fmt.Println("文档标准格式如下:")
 		fmt.Println(docFormat)
-		l, _ := getCategory()
+		l, _ := p.getCategory()
 		fmt.Println()
 		fmt.Println(fmt.Sprintf("目前支持的分类如下:"))
 		fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(l, " "))
@@ -580,6 +591,32 @@ func (p *PostManger) Status() {
 	}
 }
 
+// getCategory 获取文章分类
+func (p *PostManger) getCategory() ([]string, error) {
+	u := p.ServerHost + "/info/client?action=getCategory"
+	data, err := pkg.ClientCall(u, url.Values{})
+	if err != nil {
+		return nil, err
+	}
+	list, ok := data.([]interface{})
+	if !ok {
+		return nil, nil
+	}
+	var l []string
+	for _, v := range list {
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		t, ok := m["name"].(string)
+		if !ok {
+			continue
+		}
+		l = append(l, t)
+	}
+	return l, nil
+}
+
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
 func checkFilePath(path string) error {
 	if strings.Contains(path, " ") {
@@ -619,68 +656,6 @@ func isSupportImg(ext string) bool {
 		}
 	}
 	return false
-}
-
-// replaceImg 本地图片替换成七牛图片
-func replaceImg(filePath string) error {
-	b, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return errors.New("读取文章异常:" + err.Error())
-	}
-	if len(b) == 0 {
-		return nil
-	}
-
-	content := string(b)
-	re, _ := regexp.Compile(`\!\[.*?\]\((.*?)\)`)
-	c := re.FindAllSubmatch([]byte(content), -1)
-	if len(c) == 0 {
-		return nil
-	}
-
-	var imgToken string
-	imgToken, err = getUploadToken("")
-	if err != nil {
-		return errors.New("拉取七牛文件上传凭证异常:" + err.Error())
-	}
-
-	for _, v := range c {
-		if len(v) < 2 {
-			continue
-		}
-
-		imgURL := string(v[1])
-		ext := pkg.GetExt(imgURL)
-		if !isSupportImg(ext) {
-			log.Printf("该图片格式不支持%s", ext)
-			continue
-		}
-
-		if strings.Contains(imgURL, "jiaoliuqu.com") {
-			continue
-		}
-
-		if !strings.HasPrefix(imgURL, "../img/") && strings.HasPrefix(imgURL, `..\img\`) {
-			log.Printf("该图片路径非法%s,正确格式为../img/xx", imgURL)
-			continue
-		}
-
-		ret, err := qiniu.UploadFile(imgURL[1:], pkg.GetKey()+ext, imgToken)
-		if err != nil {
-			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
-			continue
-		}
-
-		newImg := fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", ret.Key)
-		content = strings.Replace(content, imgURL, newImg, -1)
-		log.Printf("图片替换成功,原始图片:%s,新图片:%s", imgURL, newImg)
-	}
-
-	err = ioutil.WriteFile(filePath, []byte(content), 0644)
-	if err != nil {
-		return errors.New("写入文章异常:" + err.Error())
-	}
-	return nil
 }
 
 // getMDTileCategory 获取title和分类
@@ -735,30 +710,4 @@ func getMDTileCategory(filePath string) (string, string, error) {
 		return "", "", errors.New("category不能为空")
 	}
 	return title, category, nil
-}
-
-// getCategory 获取文章分类
-func getCategory() ([]string, error) {
-	u := ServerHost + "/info/client?action=getCategory"
-	data, err := pkg.ClientCall(u, url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	list, ok := data.([]interface{})
-	if !ok {
-		return nil, nil
-	}
-	var l []string
-	for _, v := range list {
-		m, ok := v.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		t, ok := m["name"].(string)
-		if !ok {
-			continue
-		}
-		l = append(l, t)
-	}
-	return l, nil
 }

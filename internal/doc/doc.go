@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -17,13 +18,13 @@ import (
 	"z_tools/pkg/qiniu"
 )
 
-type Doc struct {}
+type Doc struct {
+	UserToken  string // 用户token
+	ServerHost string
+}
 
 var (
-	ServerHost = "http://z.jiaoliuqu.com"
-	UserToken  string // 用户token
-	env        string // 环境
-	Version    = "0.1.12"
+	Version = "0.1.12"
 )
 
 var (
@@ -38,27 +39,48 @@ var (
 	knWorkPath    = "./knowledge/"
 )
 
-func init() {
+func NewDoc() (*Doc, error) {
+	d := &Doc{}
+	err := d.Init()
+	if err != nil {
+		return nil, err
+	}
+	d.autoUpdate()
+	return d, nil
+}
+
+func (d *Doc) Init() error {
 	err := os.MkdirAll(workPostsPath, os.ModePerm)
 	if err != nil {
-		log.Printf("创建工作区目录异常:%s", err.Error())
-		return
+		return fmt.Errorf("创建工作区目录异常:%s", err.Error())
 	}
 	err = os.MkdirAll(knWorkPath, os.ModePerm)
 	if err != nil {
-		log.Printf("创建知识点工作区目录异常:%s", err.Error())
-		return
+		return fmt.Errorf("创建知识点工作区目录异常:%s", err.Error())
 	}
 	err = os.MkdirAll(imgPath, os.ModePerm)
 	if err != nil {
-		log.Printf("创建img目录异常:%s", err.Error())
-		return
+		return fmt.Errorf("创建img目录异常:%s", err.Error())
 	}
 	err = os.MkdirAll(repoObjPath, os.ModePerm)
 	if err != nil {
-		log.Printf("创建repo/objects目录异常:%s", err.Error())
-		return
+		return fmt.Errorf("创建repo/objects目录异常:%s", err.Error())
 	}
+
+	env := d.ReadEnv()
+	if env == "test" {
+		d.ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
+	} else {
+		d.ServerHost = "http://z.jiaoliuqu.com"
+	}
+
+	d.UserToken = d.ReadToken()
+
+	// 用户token校验
+	if len(os.Args) >= 2 && os.Args[1] != "init" && d.UserToken == "" {
+		return fmt.Errorf("用户token为空,请到小程序我的TAB页复制,并执行./doc init 用户token 进行初始化~")
+	}
+	return nil
 }
 
 // ReadToken 读取用户token
@@ -74,8 +96,8 @@ func (d *Doc) ReadEnv() string {
 }
 
 // getUploadToken 获取七牛token
-func getUploadToken(key string) (string, error) {
-	u := ServerHost + "/basic/getPicToken?token=" + UserToken
+func (d *Doc) getUploadToken(key string) (string, error) {
+	u := d.ServerHost + "/basic/getPicToken?token=" + d.UserToken
 	if key != "" {
 		u += "&key=" + key
 	}
@@ -112,24 +134,6 @@ func (d *Doc) InitDoc(token string, env string) {
 	log.Printf("初始化成功")
 }
 
-// ReadDocEnv 读取环境配置
-func (d *Doc) ReadDocEnv() {
-	env = d.ReadEnv()
-	if env == "test" {
-		ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
-	}
-
-	UserToken = d.ReadToken()
-
-	// 用户token校验
-	if len(os.Args) >= 2 && os.Args[1] != "init" && UserToken == "" {
-		log.Printf("用户token为空,请到小程序我的TAB页复制,并执行./doc init 用户token 进行初始化~")
-		return
-	}
-
-	d.autoUpdate()
-}
-
 // autoUpdate 自动升级
 func (d *Doc) autoUpdate() {
 	lastUpdate, _ := strconv.Atoi(d.ReadUpdateTime())
@@ -155,7 +159,7 @@ func (d *Doc) WriteUpdateTime() {
 
 // getRemoteVersion 获取服务器版本号
 func (d *Doc) getRemoteVersion() (string, error) {
-	data, err := pkg.ClientCall(ServerHost+"/info/client?action=version&token="+UserToken, url.Values{})
+	data, err := pkg.ClientCall(d.ServerHost+"/info/client?action=version&token="+d.UserToken, url.Values{})
 	if err != nil {
 		return "", err
 	}
@@ -250,7 +254,7 @@ func (d *Doc) Update(auto bool) {
 // Update2Ser 更新版本到服务器
 func (d *Doc) Update2Ser(version string) {
 	fileNameMac := "doc_" + version
-	token, err := getUploadToken(fileNameMac)
+	token, err := d.getUploadToken(fileNameMac)
 	if err != nil {
 		log.Printf("拉取七牛文件上传凭证异常:%s", err.Error())
 		return
@@ -263,7 +267,7 @@ func (d *Doc) Update2Ser(version string) {
 	log.Printf("程序mac版本上传成功,文件:%s", fileNameMac)
 
 	fileNameExe := "doc_" + version + ".exe"
-	token, err = getUploadToken(fileNameExe)
+	token, err = d.getUploadToken(fileNameExe)
 	if err != nil {
 		log.Printf("拉取七牛文件上传凭证异常:%s", err.Error())
 		return
@@ -276,7 +280,7 @@ func (d *Doc) Update2Ser(version string) {
 	log.Printf("程序win版本上传成功,文件:%s", fileNameExe)
 
 	form := url.Values{"version": {version}}
-	_, err = pkg.ClientCall(ServerHost+"/info/client?action=setVersion&token="+UserToken, form)
+	_, err = pkg.ClientCall(d.ServerHost+"/info/client?action=setVersion&token="+d.UserToken, form)
 	if err != nil {
 		log.Printf("版本设置失败:%s", err.Error())
 		return
@@ -289,7 +293,7 @@ func (d *Doc) Update2Ser(version string) {
 func (d *Doc) UpdateInstallShell() {
 	installMac := "install.sh"
 
-	token, err := getUploadToken(installMac)
+	token, err := d.getUploadToken(installMac)
 	if err != nil {
 		log.Printf("拉取七牛文件上传凭证异常:%s", err.Error())
 		return
@@ -301,4 +305,66 @@ func (d *Doc) UpdateInstallShell() {
 		return
 	}
 	log.Println("安装脚本更新成功")
+}
+
+// replaceImg 本地图片替换成七牛图片
+func (d *Doc) replaceImg(filePath string) error {
+	b, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return errors.New("读取文章异常:" + err.Error())
+	}
+	if len(b) == 0 {
+		return nil
+	}
+
+	content := string(b)
+	re, _ := regexp.Compile(`\!\[.*?\]\((.*?)\)`)
+	c := re.FindAllSubmatch([]byte(content), -1)
+	if len(c) == 0 {
+		return nil
+	}
+
+	var imgToken string
+	imgToken, err = d.getUploadToken("")
+	if err != nil {
+		return errors.New("拉取七牛文件上传凭证异常:" + err.Error())
+	}
+
+	for _, v := range c {
+		if len(v) < 2 {
+			continue
+		}
+
+		imgURL := string(v[1])
+		ext := pkg.GetExt(imgURL)
+		if !isSupportImg(ext) {
+			log.Printf("该图片格式不支持%s", ext)
+			continue
+		}
+
+		if strings.Contains(imgURL, "jiaoliuqu.com") {
+			continue
+		}
+
+		if !strings.HasPrefix(imgURL, "../img/") && strings.HasPrefix(imgURL, `..\img\`) {
+			log.Printf("该图片路径非法%s,正确格式为../img/xx", imgURL)
+			continue
+		}
+
+		ret, err := qiniu.UploadFile(imgURL[1:], pkg.GetKey()+ext, imgToken)
+		if err != nil {
+			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
+			continue
+		}
+
+		newImg := fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", ret.Key)
+		content = strings.Replace(content, imgURL, newImg, -1)
+		log.Printf("图片替换成功,原始图片:%s,新图片:%s", imgURL, newImg)
+	}
+
+	err = ioutil.WriteFile(filePath, []byte(content), 0644)
+	if err != nil {
+		return errors.New("写入文章异常:" + err.Error())
+	}
+	return nil
 }

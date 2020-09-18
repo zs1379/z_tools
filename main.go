@@ -35,7 +35,11 @@ func main() {
 					if c.NArg() >= 2 {
 						env = c.Args().Get(1)
 					}
-					d := &doc.Doc{}
+					d, err := doc.NewDoc()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					d.InitDoc(c.Args().Get(0), env)
 					return nil
 				},
@@ -46,7 +50,11 @@ func main() {
 				Description: "1. doc update 升级程序版本",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					d := &doc.Doc{}
+					d, err := doc.NewDoc()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					d.Update(false)
 					return nil
 				},
@@ -61,7 +69,11 @@ func main() {
 						log.Printf("请输入版本号")
 						return nil
 					}
-					d := &doc.Doc{}
+					d, err := doc.NewDoc()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					d.Update2Ser(c.Args().Get(0))
 					return nil
 				},
@@ -72,7 +84,11 @@ func main() {
 				Description: "1. doc updateInstall",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					d := &doc.Doc{}
+					d, err := doc.NewDoc()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					d.UpdateInstallShell()
 					return nil
 				},
@@ -87,8 +103,12 @@ func main() {
 						log.Printf("请输入文件名,命令行格式./doc new xx")
 						return nil
 					}
-					d := &doc.PostManger{}
-					d.NewDoc(c.Args().Get(0))
+					p, err := doc.NewPostManger()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
+					p.NewDoc(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -102,8 +122,12 @@ func main() {
 						log.Printf("请输入文件名,命令行格式./doc add xx.md")
 						return nil
 					}
-					d := &doc.PostManger{}
-					d.Add(c.Args().Get(0))
+					p, err := doc.NewPostManger()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
+					p.Add(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -113,8 +137,12 @@ func main() {
 				Description: "1. doc pull 从服务器拉取最新文章列表到本地",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					d := &doc.PostManger{}
-					d.Pull()
+					p, err := doc.NewPostManger()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
+					p.Pull()
 					return nil
 				},
 			},
@@ -124,7 +152,11 @@ func main() {
 				Description: "1. doc push 把本地仓库变更提交到服务器",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					d := &doc.PostManger{}
+					d, err := doc.NewPostManger()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					d.Push()
 					return nil
 				},
@@ -139,7 +171,11 @@ func main() {
 						log.Printf("请输入文件名,命令行格式./doc rm xx.md")
 						return nil
 					}
-					d := &doc.PostManger{}
+					d, err := doc.NewPostManger()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					d.Rm(c.Args().Get(0))
 					return nil
 				},
@@ -150,8 +186,12 @@ func main() {
 				Description: "1. doc status 比对本地仓库和工作区的文件变更",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					d := &doc.PostManger{}
-					d.Status()
+					p, err := doc.NewPostManger()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
+					p.Status()
 					return nil
 				},
 			},
@@ -165,8 +205,12 @@ func main() {
 						log.Printf("请输入文件名,命令行格式./doc checkout xx.md 支持点号")
 						return nil
 					}
-					d := &doc.PostManger{}
-					d.Checkout(c.Args().Get(0))
+					p, err := doc.NewPostManger()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
+					p.Checkout(c.Args().Get(0))
 					return nil
 				},
 			},
@@ -180,7 +224,11 @@ func main() {
 						log.Printf("请输入知识点")
 						return nil
 					}
-					k := &doc.KnowledgeManager{}
+					k, err := doc.NewKnowledgeManager()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					k.KPull(c.Args().Get(0))
 					return nil
 				},
@@ -195,12 +243,15 @@ func main() {
 						log.Printf("请输入知识点")
 						return nil
 					}
-
 					if c.NArg() < 2 {
 						log.Printf("请输入修改日志")
 						return nil
 					}
-					k := &doc.KnowledgeManager{}
+					k, err := doc.NewKnowledgeManager()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					k.KAdd(c.Args().Get(0), c.Args().Get(1))
 					return nil
 				},
@@ -215,7 +266,11 @@ func main() {
 						log.Printf("请输入知识点")
 						return nil
 					}
-					k := &doc.KnowledgeManager{}
+					k, err := doc.NewKnowledgeManager()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					k.KPush(c.Args().Get(0))
 					return nil
 				},
@@ -230,7 +285,11 @@ func main() {
 						log.Printf("请输入知识点")
 						return nil
 					}
-					k := &doc.KnowledgeManager{}
+					k, err := doc.NewKnowledgeManager()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					k.KNew(c.Args().Get(0))
 					return nil
 				},
@@ -249,7 +308,11 @@ func main() {
 						log.Printf("请输入别名")
 						return nil
 					}
-					k := &doc.KnowledgeManager{}
+					k, err := doc.NewKnowledgeManager()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					k.Krel(c.Args().Get(0), c.Args().Get(1))
 					return nil
 				},
@@ -260,7 +323,11 @@ func main() {
 				Description: "1. doc kstatus 比对本地仓库和工作区的知识点变更",
 				ArgsUsage:   " ",
 				Action: func(c *cli.Context) error {
-					k := &doc.KnowledgeManager{}
+					k, err := doc.NewKnowledgeManager()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					k.StatusKn()
 					return nil
 				},
@@ -275,7 +342,11 @@ func main() {
 						log.Printf("请输入知识点,命令行格式./doc kcheckout xx 支持点号")
 						return nil
 					}
-					k := &doc.KnowledgeManager{}
+					k, err := doc.NewKnowledgeManager()
+					if err != nil {
+						log.Printf(err.Error())
+						return nil
+					}
 					k.CheckoutKN(c.Args().Get(0))
 					return nil
 				},
@@ -285,9 +356,6 @@ func main() {
 
 	sort.Sort(cli.FlagsByName(app.Flags))
 	sort.Sort(cli.CommandsByName(app.Commands))
-
-	d := &doc.Doc{}
-	d.ReadDocEnv()
 
 	err := app.Run(os.Args)
 	if err != nil {

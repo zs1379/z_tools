@@ -15,6 +15,19 @@ import (
 )
 
 type KnowledgeManager struct {
+	*Doc
+}
+
+func NewKnowledgeManager() (*KnowledgeManager, error) {
+	d, err := NewDoc()
+	if err != nil {
+		return nil, err
+	}
+
+	k := &KnowledgeManager{
+		Doc: d,
+	}
+	return k, nil
 }
 
 // KnowledgeDesc 知识点描述
@@ -76,7 +89,7 @@ func (k *KnowledgeManager) getKNLocalVersion(kName string) string {
 
 // KPull 远程拉取知识点
 func (k *KnowledgeManager) KPull(kName string) {
-	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=kget&token=%s&kname=%s", ServerHost, UserToken, kName), url.Values{})
+	data, err := pkg.ClientCall(fmt.Sprintf("%s/info/client?action=kget&token=%s&kname=%s", k.ServerHost, k.UserToken, kName), url.Values{})
 	if err != nil {
 		log.Printf("拉取远程知识点异常:%s", err.Error())
 		return
@@ -184,12 +197,12 @@ func (k *KnowledgeManager) KPush(kName string) {
 	form := url.Values{
 		"change_log":   {knDes.Changelog},
 		"version":      {localV},
-		"token":        {UserToken},
+		"token":        {k.UserToken},
 		"kname":        {knDes.KName},
 		"file_content": {content},
 	}
 
-	url := fmt.Sprintf("%s/info/client?action=kadd", ServerHost)
+	url := fmt.Sprintf("%s/info/client?action=kadd", k.ServerHost)
 	_, err = pkg.ClientCall(url, form)
 	if err != nil {
 		if strings.Contains(err.Error(), "i1069") {
@@ -207,11 +220,11 @@ func (k *KnowledgeManager) KPush(kName string) {
 
 func (k *KnowledgeManager) KNew(kName string) {
 	form := url.Values{
-		"token": {UserToken},
+		"token": {k.UserToken},
 		"kname": {kName},
 	}
 
-	url := fmt.Sprintf("%s/info/client?token=%s&action=knew", ServerHost, UserToken)
+	url := fmt.Sprintf("%s/info/client?token=%s&action=knew", k.ServerHost, k.UserToken)
 	_, err := pkg.ClientCall(url, form)
 	if err != nil {
 		log.Printf("创建知识点异常:%s,知识点:%s", err.Error(), kName)
@@ -221,12 +234,12 @@ func (k *KnowledgeManager) KNew(kName string) {
 
 func (k *KnowledgeManager) Krel(kName string, rel string) {
 	form := url.Values{
-		"token":     {UserToken},
+		"token":     {k.UserToken},
 		"kname":     {kName},
 		"like_name": {rel},
 	}
 
-	url := fmt.Sprintf("%s/info/client?token=%s&action=krel", ServerHost, UserToken)
+	url := fmt.Sprintf("%s/info/client?token=%s&action=krel", k.ServerHost, k.UserToken)
 	_, err := pkg.ClientCall(url, form)
 	if err != nil {
 		log.Printf("创建知识点别名异常:%s,知识点:%s", err.Error(), kName)
@@ -249,7 +262,7 @@ func (k *KnowledgeManager) KAdd(kName string, changelog string) {
 		return
 	}
 
-	err = replaceImg(knPath)
+	err = k.replaceImg(knPath)
 	if err != nil {
 		log.Printf("图片替换异常,err:%s,文件名:%s", err.Error(), kName)
 		return
