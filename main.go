@@ -98,6 +98,13 @@ func main() {
 				Usage:       "新建文章",
 				Description: "1. doc new test 本地自动生成一篇test.md的空文档",
 				ArgsUsage:   "[文件名]",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "title",
+						Value: "",
+						Usage: "文章的title",
+					},
+				},
 				Action: func(c *cli.Context) error {
 					if c.NArg() < 1 {
 						log.Printf("请输入文件名,命令行格式./doc new xx")
@@ -108,7 +115,7 @@ func main() {
 						log.Printf(err.Error())
 						return nil
 					}
-					p.NewDoc(c.Args().Get(0))
+					p.NewDoc(c.Args().Get(0), c.String("title"))
 					return nil
 				},
 			},

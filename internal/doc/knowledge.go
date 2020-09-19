@@ -159,7 +159,7 @@ func (k *KnowledgeManager) KPull(kName string) {
 		if maxV > 0 {
 			pkg.CopyFile(knFilePath, fmt.Sprintf("%s%s/%d/%s.md", knWorkPath, kName, maxV, kName))
 		} else {
-			pkg.WriteFile(knFilePath,"")
+			pkg.WriteFile(knFilePath, "")
 		}
 	}
 
@@ -236,14 +236,14 @@ func (k *KnowledgeManager) KNew(kName string) {
 	}
 
 	knFilePath := fmt.Sprintf("%s/%s.md", knWorkPath, kName)
-	err = pkg.WriteFile(knFilePath,"")
+	err = pkg.WriteFile(knFilePath, "")
 	if err != nil {
 		log.Printf("创建知识点工作区文件异常:%s", err.Error())
 		return
 	}
 
 	versionPath := fmt.Sprintf("%s%s/version", knWorkPath, kName)
-	err = pkg.WriteFile(versionPath,"")
+	err = pkg.WriteFile(versionPath, "")
 	if err != nil {
 		log.Printf("写入知识点工作区版本号文件异常:%s", err.Error())
 		return
@@ -295,15 +295,17 @@ func (k *KnowledgeManager) KAdd(kName string, changelog string) {
 	knDes := localKN[kName]
 	if knDes == nil {
 		knDes = &KnowledgeDesc{KName: kName}
-	} else {
-		if knDes.Md5 == fileMd5 {
-			return
-		}
+	}
 
-		// 移除旧文件
-		if knDes.Md5 != "" {
-			os.Remove(repoObjPath + knDes.Md5)
-		}
+	// 判断是否有变更
+	if knDes.Md5 == fileMd5 {
+		log.Printf("知识点无变更,知识点:%s", kName)
+		return
+	}
+
+	// 移除旧文件
+	if knDes.Md5 != "" {
+		os.Remove(repoObjPath + knDes.Md5)
 	}
 
 	knDes.Changelog = changelog

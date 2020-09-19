@@ -289,7 +289,7 @@ func (p *PostManger) Pull() {
 }
 
 // NewDoc 新建文件
-func (p *PostManger) NewDoc(fileName string) {
+func (p *PostManger) NewDoc(fileName string, title string) {
 	l, err := p.getCategory()
 	fmt.Println()
 	fmt.Println(fmt.Sprintf("    选择你文章的分类(单选),目前支持的分类如下:"))
@@ -351,7 +351,10 @@ title: %s
 category: %s
 ---`
 
-	docContent := fmt.Sprintf(docFormat, fileName[0:len(fileName)-3], category)
+	if title == "" {
+		title = fileName[0 : len(fileName)-3]
+	}
+	docContent := fmt.Sprintf(docFormat, title, category)
 	err = ioutil.WriteFile(workPostsPath+fileName, []byte(docContent), 0644)
 	if err != nil {
 		log.Printf("本地创建文章异常:%s,文章:%s", err.Error(), fileName)
