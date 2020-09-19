@@ -239,9 +239,10 @@ func VersionCompare(v1, v2 string) bool {
 	for i := 0; i < len(v1Arr); i++ {
 		t1, _ := strconv.Atoi(v1Arr[i])
 		t2, _ := strconv.Atoi(v2Arr[i])
-		if t1 > t2 {
-			return true
+		if t1 == t2 {
+			continue
 		}
+		return t1 > t2
 	}
 	return false
 }
