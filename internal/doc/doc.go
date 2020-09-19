@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.2.1"
+	Version = "0.3.1"
 )
 
 var (
@@ -71,7 +71,7 @@ func (d *Doc) Init() error {
 	if env == "test" {
 		d.ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	} else {
-		d.ServerHost = "http://z.jiaoliuqu.com"
+		d.ServerHost = "http://z1.jiaoliuqu.com"
 	}
 
 	d.UserToken = d.ReadToken()
