@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.3.1"
+	Version = "0.4.0"
 )
 
 var (
@@ -36,7 +36,7 @@ var (
 
 type Doc struct {
 	UserToken  string // 用户token
-	ServerHost string
+	ServerHost string // 服务器域名
 }
 
 func NewDoc() (*Doc, error) {
@@ -71,7 +71,7 @@ func (d *Doc) Init() error {
 	if env == "test" {
 		d.ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	} else {
-		d.ServerHost = "http://z1.jiaoliuqu.com"
+		d.ServerHost = "http://z.jiaoliuqu.com"
 	}
 
 	d.UserToken = d.ReadToken()

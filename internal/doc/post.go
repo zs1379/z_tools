@@ -163,7 +163,7 @@ func (p *PostManger) Push() {
 			continue
 		}
 
-		title, category, err := getMDTileCategory(repoObjPath + v.Md5)
+		title, category, tag, err := getMDTileCategory(repoObjPath + v.Md5)
 		if err != nil {
 			log.Printf("读取文章title和分类异常:%s,文章:%s", err.Error(), v.FileName)
 			continue
@@ -178,9 +178,11 @@ func (p *PostManger) Push() {
 			"title":      {title},
 			"category":   {category},
 			"updateTime": {v.UpdateTime},
+			"tagNames":   tag,
 		}
 
 		url := fmt.Sprintf("%s/info/client?token=%s&action=add", p.ServerHost, p.UserToken)
+
 		_, err = pkg.ClientCall(url, form)
 		if err != nil {
 			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
@@ -349,6 +351,7 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	docFormat := `---
 title: %s
 category: %s
+tag: 
 ---`
 
 	if title == "" {
@@ -461,11 +464,12 @@ func (p *PostManger) doAdd(fileName string) {
 		return
 	}
 
-	_, _, err = getMDTileCategory(workPostsPath + fileName)
+	_, _, _, err = getMDTileCategory(workPostsPath + fileName)
 	if err != nil {
 		docFormat := `---
 title: 这是标题
 category: 文章分类
+tag: tag1 tag2
 ---`
 		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
 		fmt.Println()
@@ -662,55 +666,62 @@ func isSupportImg(ext string) bool {
 }
 
 // getMDTileCategory 获取title和分类
-func getMDTileCategory(filePath string) (string, string, error) {
+func getMDTileCategory(filePath string) (string, string, []string, error) {
 	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return "", "", err
+		return "", "", []string{}, err
 	}
 
 	r := bufio.NewReader(strings.NewReader(string(b)))
-	line1, _, err := r.ReadLine()
+	line, _, err := r.ReadLine()
 	if err != nil {
-		return "", "", errors.New("第一行读取错误:" + err.Error())
+		return "", "", []string{}, errors.New("第一行读取错误:" + err.Error())
 	}
 
-	if string(line1) != "---" {
-		return "", "", errors.New("格式错误,文档第一行需---开头")
+	if string(line) != "---" {
+		return "", "", []string{}, errors.New("格式错误,文档第一行需---开头")
 	}
 
-	line2, _, err := r.ReadLine()
+	// 获取title
+	line, _, err = r.ReadLine()
 	if err != nil {
-		return "", "", errors.New("第二行读取错误:" + err.Error())
+		return "", "", []string{}, errors.New("读取title错误:" + err.Error())
 	}
-
-	line2Str := string(line2)
-	if len(line2Str) <= 6 {
-		return "", "", errors.New("格式错误,文档第二行需title:开头")
-	}
-	if line2Str[:6] != "title:" {
-		return "", "", errors.New("格式错误,文档第二行需title:开头")
-	}
-
-	title := strings.TrimSpace(line2Str[6:])
-	if title == "" {
-		return "", "", errors.New("title不能为空")
-	}
-
-	line3, _, err := r.ReadLine()
+	title, err := getField(string(line), "title:")
 	if err != nil {
-		return "", "", errors.New("第三行读取错误:" + err.Error())
-	}
-	line3Str := string(line3)
-	if len(line3Str) <= 9 {
-		return "", "", errors.New("格式错误,文档第三行需category:开头")
-	}
-	if line3Str[:9] != "category:" {
-		return "", "", errors.New("格式错误,文档第三行需category:开头")
+		return "", "", []string{}, err
 	}
 
-	category := strings.TrimSpace(line3Str[9:])
-	if category == "" {
-		return "", "", errors.New("category不能为空")
+	// 获取分类
+	line, _, err = r.ReadLine()
+	if err != nil {
+		return "", "", []string{}, errors.New("读取category错误:" + err.Error())
 	}
-	return title, category, nil
+	category, err := getField(string(line), "category:")
+	if err != nil {
+		return "", "", []string{}, err
+	}
+
+	// 获取tag
+	line, _, err = r.ReadLine()
+	if err != nil {
+		return "", "", []string{}, errors.New("读取tag错误:" + err.Error())
+	}
+	tag, err := getField(string(line), "tag:")
+	if err != nil {
+		return "", "", []string{}, err
+	}
+	tagArr := strings.Split(tag, " ")
+
+	return title, category, tagArr, nil
+}
+
+func getField(str string, field string) (string, error) {
+	if len(str) <= len(field) {
+		return "", fmt.Errorf("格式错误,文档需%s开头", field)
+	}
+	if str[:len(field)] != field {
+		return "", fmt.Errorf("格式错误,文档需%s开头", field)
+	}
+	return strings.TrimSpace(str[len(field):]), nil
 }
