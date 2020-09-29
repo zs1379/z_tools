@@ -163,7 +163,7 @@ func (p *PostManger) Push() {
 			continue
 		}
 
-		title, category, tag, err := getMDTileCategory(repoObjPath + v.Md5)
+		title, category, _, err := getMDTileCategory(repoObjPath + v.Md5)
 		if err != nil {
 			log.Printf("读取文章title和分类异常:%s,文章:%s", err.Error(), v.FileName)
 			continue
@@ -178,7 +178,7 @@ func (p *PostManger) Push() {
 			"title":      {title},
 			"category":   {category},
 			"updateTime": {v.UpdateTime},
-			"tagNames":   tag,
+			//"tagNames":   tag,
 		}
 
 		url := fmt.Sprintf("%s/info/client?token=%s&action=add", p.ServerHost, p.UserToken)
@@ -702,6 +702,7 @@ func getMDTileCategory(filePath string) (string, string, []string, error) {
 		return "", "", []string{}, err
 	}
 
+	/*
 	// 获取tag
 	line, _, err = r.ReadLine()
 	if err != nil {
@@ -712,8 +713,8 @@ func getMDTileCategory(filePath string) (string, string, []string, error) {
 		return "", "", []string{}, err
 	}
 	tagArr := strings.Split(tag, " ")
-
-	return title, category, tagArr, nil
+	*/
+	return title, category, []string{}, nil
 }
 
 func getField(str string, field string) (string, error) {

@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.4.0"
+	Version = "0.3.3"
 )
 
 var (
@@ -71,7 +71,7 @@ func (d *Doc) Init() error {
 	if env == "test" {
 		d.ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	} else {
-		d.ServerHost = "http://z.jiaoliuqu.com"
+		d.ServerHost = "http://z1.jiaoliuqu.com"
 	}
 
 	d.UserToken = d.ReadToken()
@@ -330,6 +330,7 @@ func (d *Doc) replaceImg(filePath string) error {
 		return errors.New("拉取七牛文件上传凭证异常:" + err.Error())
 	}
 
+	change := false
 	for _, v := range c {
 		if len(v) < 2 {
 			continue
@@ -346,25 +347,23 @@ func (d *Doc) replaceImg(filePath string) error {
 			continue
 		}
 
-		if !strings.HasPrefix(imgURL, "../img/") && strings.HasPrefix(imgURL, `..\img\`) {
-			log.Printf("该图片路径非法%s,正确格式为../img/xx", imgURL)
-			continue
-		}
-
-		ret, err := qiniu.UploadFile(imgURL[1:], pkg.GetKey()+ext, imgToken)
+		ret, err := qiniu.UploadFile(imgURL, pkg.GetKey()+ext, imgToken)
 		if err != nil {
 			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
 			continue
 		}
 
+		change = true
 		newImg := fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", ret.Key)
 		content = strings.Replace(content, imgURL, newImg, -1)
 		log.Printf("图片替换成功,原始图片:%s,新图片:%s", imgURL, newImg)
 	}
 
-	err = ioutil.WriteFile(filePath, []byte(content), 0644)
-	if err != nil {
-		return errors.New("写入文章异常:" + err.Error())
+	if change {
+		err = ioutil.WriteFile(filePath, []byte(content), 0644)
+		if err != nil {
+			return errors.New("写入文章异常:" + err.Error())
+		}
 	}
 	return nil
 }
