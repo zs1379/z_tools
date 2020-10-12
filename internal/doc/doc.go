@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.3.3"
+	Version = "0.3.5"
 )
 
 var (
@@ -203,7 +203,11 @@ func (d *Doc) Update(auto bool) {
 	// 自动检测的给用户选择
 	if auto {
 		fmt.Println()
-		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, "检测到有新版本,按n取消,按其余任意键升级~")
+		if runtime.GOOS == "windows" {
+			fmt.Printf("    %s\n", "检测到有新版本,按n取消,按其余任意键升级~")
+		} else {
+			fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, "检测到有新版本,按n取消,按其余任意键升级~")
+		}
 		fmt.Printf("    请输入:")
 		input := bufio.NewScanner(os.Stdin)
 		input.Scan()

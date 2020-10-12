@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -300,7 +301,12 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	for k, v := range l {
 		str += fmt.Sprintf("%d:%s ", k+1, v)
 	}
-	fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, str)
+
+	if runtime.GOOS == "windows" {
+		fmt.Printf("    %s\n", str)
+	} else {
+		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, str)
+	}
 	fmt.Println()
 	fmt.Print("    请输入分类编号:")
 
@@ -351,7 +357,6 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	docFormat := `---
 title: %s
 category: %s
-tag: 
 ---`
 
 	if title == "" {
@@ -469,7 +474,6 @@ func (p *PostManger) doAdd(fileName string) {
 		docFormat := `---
 title: 这是标题
 category: 文章分类
-tag: tag1 tag2
 ---`
 		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
 		fmt.Println()
@@ -478,7 +482,11 @@ tag: tag1 tag2
 		l, _ := p.getCategory()
 		fmt.Println()
 		fmt.Println(fmt.Sprintf("目前支持的分类如下:"))
-		fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(l, " "))
+		if runtime.GOOS == "windows" {
+			fmt.Printf("%s\n", strings.Join(l, " "))
+		} else {
+			fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(l, " "))
+		}
 		fmt.Println()
 		return
 	}
