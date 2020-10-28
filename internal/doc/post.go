@@ -164,7 +164,7 @@ func (p *PostManger) Push() {
 			continue
 		}
 
-		title, category, _, err := getMDTileCategory(repoObjPath + v.Md5)
+		title, category, tag, err := getMDTileCategory(repoObjPath + v.Md5)
 		if err != nil {
 			log.Printf("读取文章title和分类异常:%s,文章:%s", err.Error(), v.FileName)
 			continue
@@ -179,7 +179,7 @@ func (p *PostManger) Push() {
 			"title":      {title},
 			"category":   {category},
 			"updateTime": {v.UpdateTime},
-			//"tagNames":   tag,
+			"tagNames":   tag,
 		}
 
 		url := fmt.Sprintf("%s/info/client?token=%s&action=add", p.ServerHost, p.UserToken)
@@ -336,6 +336,62 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	}
 	fmt.Println()
 
+	fmt.Println(fmt.Sprintf("    选择你文章的tag(多选),常用tag如下:"))
+
+	tagList, _ := p.getTagList()
+	var tagStr string
+	for k, v := range tagList {
+		tagStr += fmt.Sprintf("%d:%s ", k+1, v)
+	}
+
+	if runtime.GOOS == "windows" {
+		fmt.Printf("    %s\n", tagStr)
+	} else {
+		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, tagStr)
+	}
+	fmt.Println()
+	fmt.Print("    请输入tag编号,多个空格隔开:")
+
+	tagInput := bufio.NewScanner(os.Stdin)
+
+	var tagArr []string
+	for {
+		tagInput.Scan()
+		v := strings.TrimSpace(tagInput.Text())
+		if v == "" {
+			fmt.Print("    输入为空,请重新输入:")
+			continue
+		}
+
+		arr := strings.Split(v, " ")
+		if len(arr) == 0 {
+			fmt.Print("    输入为空,请重新输入:")
+			continue
+		}
+
+		tagArr = []string{}
+		inputOk := true
+		for _, v := range arr {
+			vIndex, err := strconv.Atoi(v)
+			if err != nil {
+				fmt.Print("    输入的编号需为数字,请重新输入:")
+				inputOk = false
+				break
+			}
+			if vIndex > len(tagList) || vIndex < 1 {
+				fmt.Print("    输入的编号不存在,请重新输入:")
+				inputOk = false
+				break
+			}
+
+			tagArr = append(tagArr, tagList[vIndex-1])
+		}
+		if inputOk {
+			break
+		}
+	}
+	fmt.Println()
+
 	i := strings.Index(fileName, ".")
 	if i > 0 {
 		fileName = fileName[:i]
@@ -357,18 +413,19 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	docFormat := `---
 title: %s
 category: %s
+tag: %s
 ---`
 
 	if title == "" {
 		title = fileName[0 : len(fileName)-3]
 	}
-	docContent := fmt.Sprintf(docFormat, title, category)
+	docContent := fmt.Sprintf(docFormat, title, category, strings.Join(tagArr, " "))
 	err = ioutil.WriteFile(workPostsPath+fileName, []byte(docContent), 0644)
 	if err != nil {
 		log.Printf("本地创建文章异常:%s,文章:%s", err.Error(), fileName)
 		return
 	}
-	log.Printf("文件创建成功,文件名:%s, 分类:%s", fileName, category)
+	log.Printf("文件创建成功,文件名:%s, 分类:%s, tag:%s", fileName, category, strings.Join(tagArr, " "))
 	return
 }
 
@@ -474,8 +531,9 @@ func (p *PostManger) doAdd(fileName string) {
 		docFormat := `---
 title: 这是标题
 category: 文章分类
+tag: tag1
 ---`
-		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
+		log.Printf("获取文件格式异常,err:%s,文件名:%s", err.Error(), fileName)
 		fmt.Println()
 		fmt.Println("文档标准格式如下:")
 		fmt.Println(docFormat)
@@ -486,6 +544,14 @@ category: 文章分类
 			fmt.Printf("%s\n", strings.Join(l, " "))
 		} else {
 			fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(l, " "))
+		}
+		fmt.Println()
+		tagList, _ := p.getTagList()
+		fmt.Println(fmt.Sprintf("目前支持的tag如下,多个空格隔开:"))
+		if runtime.GOOS == "windows" {
+			fmt.Printf("%s\n", strings.Join(tagList, " "))
+		} else {
+			fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(tagList, " "))
 		}
 		fmt.Println()
 		return
@@ -632,6 +698,11 @@ func (p *PostManger) getCategory() ([]string, error) {
 	return l, nil
 }
 
+// getTagList 获取常用的tag
+func (p *PostManger) getTagList() ([]string, error) {
+	return []string{"go", "web", "mysql", "android", "ios", "大数据", "操作系统"}, nil
+}
+
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
 func checkFilePath(path string) error {
 	if strings.Contains(path, " ") {
@@ -710,7 +781,6 @@ func getMDTileCategory(filePath string) (string, string, []string, error) {
 		return "", "", []string{}, err
 	}
 
-	/*
 	// 获取tag
 	line, _, err = r.ReadLine()
 	if err != nil {
@@ -721,8 +791,7 @@ func getMDTileCategory(filePath string) (string, string, []string, error) {
 		return "", "", []string{}, err
 	}
 	tagArr := strings.Split(tag, " ")
-	*/
-	return title, category, []string{}, nil
+	return title, category, tagArr, nil
 }
 
 func getField(str string, field string) (string, error) {

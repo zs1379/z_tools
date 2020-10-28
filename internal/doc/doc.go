@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.3.5"
+	Version = "0.4.1"
 )
 
 var (
@@ -71,7 +71,7 @@ func (d *Doc) Init() error {
 	if env == "test" {
 		d.ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	} else {
-		d.ServerHost = "http://z1.jiaoliuqu.com"
+		d.ServerHost = "http://z.jiaoliuqu.com"
 	}
 
 	d.UserToken = d.ReadToken()
@@ -86,7 +86,7 @@ func (d *Doc) Init() error {
 // ReadToken 读取用户token
 func (d *Doc) ReadToken() string {
 	b, _ := ioutil.ReadFile(tokenPath)
-	return string(b)
+	return strings.TrimSpace(string(b))
 }
 
 // ReadEnv 读取环境变量
