@@ -179,11 +179,12 @@ func (p *PostManger) Push() {
 			"title":      {title},
 			"category":   {category},
 			"updateTime": {v.UpdateTime},
-			"tagNames":   tag,
 		}
-
-		url := fmt.Sprintf("%s/info/client?token=%s&action=add", p.ServerHost, p.UserToken)
-
+		var tagStr string
+		for _,v := range tag {
+			tagStr += fmt.Sprintf("&tagNames=%s",v)
+		}
+		url := fmt.Sprintf("%s/info/client?token=%s&action=add"+tagStr, p.ServerHost, p.UserToken)
 		_, err = pkg.ClientCall(url, form)
 		if err != nil {
 			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
@@ -700,7 +701,15 @@ func (p *PostManger) getCategory() ([]string, error) {
 
 // getTagList 获取常用的tag
 func (p *PostManger) getTagList() ([]string, error) {
-	return []string{"go", "web", "mysql", "android", "ios", "大数据", "操作系统"}, nil
+	l := []string{
+		"java", "php", "go", "node.js", "oc", "spring", "后端",
+		"小程序", "ios", "android", "kotlin", "flutter", "xcode",
+		"js", "vue", "html", "css", "typescript", "html5",
+		"mysql", "redis", "sql", "json", "数据库", "nosql",
+		"linux", "nginx", "docker", "k8s",
+	}
+
+	return l, nil
 }
 
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
