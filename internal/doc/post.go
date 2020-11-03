@@ -181,8 +181,8 @@ func (p *PostManger) Push() {
 			"updateTime": {v.UpdateTime},
 		}
 		var tagStr string
-		for _,v := range tag {
-			tagStr += fmt.Sprintf("&tagNames=%s",v)
+		for _, v := range tag {
+			tagStr += fmt.Sprintf("&tagNames=%s", v)
 		}
 		url := fmt.Sprintf("%s/info/client?token=%s&action=add"+tagStr, p.ServerHost, p.UserToken)
 		_, err = pkg.ClientCall(url, form)
@@ -337,12 +337,12 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	}
 	fmt.Println()
 
-	fmt.Println(fmt.Sprintf("    选择你文章的tag(多选),常用tag如下:"))
+	fmt.Println(fmt.Sprintf("    设置你文章的tag,常用tag如下:"))
 
 	tagList, _ := p.getTagList()
 	var tagStr string
-	for k, v := range tagList {
-		tagStr += fmt.Sprintf("%d:%s ", k+1, v)
+	for _, v := range tagList {
+		tagStr += fmt.Sprintf("%s ", v)
 	}
 
 	if runtime.GOOS == "windows" {
@@ -351,46 +351,13 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, tagStr)
 	}
 	fmt.Println()
-	fmt.Print("    请输入tag编号,多个空格隔开:")
+	fmt.Print("    请输入tag,多个空格隔开:")
 
 	tagInput := bufio.NewScanner(os.Stdin)
 
 	var tagArr []string
-	for {
-		tagInput.Scan()
-		v := strings.TrimSpace(tagInput.Text())
-		if v == "" {
-			fmt.Print("    输入为空,请重新输入:")
-			continue
-		}
-
-		arr := strings.Split(v, " ")
-		if len(arr) == 0 {
-			fmt.Print("    输入为空,请重新输入:")
-			continue
-		}
-
-		tagArr = []string{}
-		inputOk := true
-		for _, v := range arr {
-			vIndex, err := strconv.Atoi(v)
-			if err != nil {
-				fmt.Print("    输入的编号需为数字,请重新输入:")
-				inputOk = false
-				break
-			}
-			if vIndex > len(tagList) || vIndex < 1 {
-				fmt.Print("    输入的编号不存在,请重新输入:")
-				inputOk = false
-				break
-			}
-
-			tagArr = append(tagArr, tagList[vIndex-1])
-		}
-		if inputOk {
-			break
-		}
-	}
+	tagInput.Scan()
+	tagArr = strings.Split(strings.TrimSpace(tagInput.Text()), " ")
 	fmt.Println()
 
 	i := strings.Index(fileName, ".")
@@ -797,9 +764,9 @@ func getMDTileCategory(filePath string) (string, string, []string, error) {
 	}
 	tag, err := getField(string(line), "tag:")
 	if err != nil {
-		return "", "", []string{}, err
+		return "", "", []string{}, nil
 	}
-	tagArr := strings.Split(tag, " ")
+	tagArr := TrimStringArr(strings.Split(tag, " "))
 	return title, category, tagArr, nil
 }
 
@@ -811,4 +778,14 @@ func getField(str string, field string) (string, error) {
 		return "", fmt.Errorf("格式错误,文档需%s开头", field)
 	}
 	return strings.TrimSpace(str[len(field):]), nil
+}
+
+func TrimStringArr(arr []string) []string{
+	var newArr []string
+	for _, v := range arr {
+		if v != "" {
+			newArr = append(newArr, v)
+		}
+	}
+	return newArr
 }
