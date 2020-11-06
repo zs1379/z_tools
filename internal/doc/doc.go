@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.4.2"
+	Version = "0.4.3"
 )
 
 var (
@@ -347,7 +347,7 @@ func (d *Doc) replaceImg(filePath string) error {
 			continue
 		}
 
-		if strings.Contains(imgURL, "jiaoliuqu.com") {
+		if strings.Contains(imgURL,"jiaoliuqu.com") || strings.Contains(imgURL, "xiaoy.name"){
 			continue
 		}
 
@@ -358,7 +358,7 @@ func (d *Doc) replaceImg(filePath string) error {
 		}
 
 		change = true
-		newImg := fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", ret.Key)
+		newImg := fmt.Sprintf("https://zpic.xiaoy.name/%s", ret.Key)
 		content = strings.Replace(content, imgURL, newImg, -1)
 		log.Printf("图片替换成功,原始图片:%s,新图片:%s", imgURL, newImg)
 	}
