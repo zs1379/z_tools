@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.4.3"
+	Version = "0.4.4"
 )
 
 var (
@@ -71,7 +71,7 @@ func (d *Doc) Init() error {
 	if env == "test" {
 		d.ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	} else {
-		d.ServerHost = "http://z.jiaoliuqu.com"
+		d.ServerHost = "http://z.xiaoy.name"
 	}
 
 	d.UserToken = d.ReadToken()
@@ -229,7 +229,7 @@ func (d *Doc) Update(auto bool) {
 		newFile += ".exe"
 	}
 
-	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", newFile), newFile)
+	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.xiaoy.name/%s", newFile), newFile)
 	if err != nil {
 		log.Printf("获取新版本文件异常:%s", err.Error())
 		return
