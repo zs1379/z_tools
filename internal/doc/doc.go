@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.4.4"
+	Version = "0.4.7"
 )
 
 var (
@@ -71,7 +71,7 @@ func (d *Doc) Init() error {
 	if env == "test" {
 		d.ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	} else {
-		d.ServerHost = "http://z.xiaoy.name"
+		d.ServerHost = "http://z1.xiaoy.name"
 	}
 
 	d.UserToken = d.ReadToken()
@@ -347,7 +347,7 @@ func (d *Doc) replaceImg(filePath string) error {
 			continue
 		}
 
-		if strings.Contains(imgURL,"jiaoliuqu.com") || strings.Contains(imgURL, "xiaoy.name"){
+		if strings.Contains(imgURL, "jiaoliuqu.com") || strings.Contains(imgURL, "xiaoy.name") {
 			continue
 		}
 
@@ -370,4 +370,38 @@ func (d *Doc) replaceImg(filePath string) error {
 		}
 	}
 	return nil
+}
+
+// readImgPath 读取文件里面的图片地址
+func (d *Doc) readImgPath(filePath string) []string {
+	var imgs []string
+	b, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return imgs
+	}
+	if len(b) == 0 {
+		return imgs
+	}
+
+	content := string(b)
+	re, _ := regexp.Compile(`\!\[.*?\]\((.*?)\)`)
+	c := re.FindAllSubmatch([]byte(content), -1)
+	if len(c) == 0 {
+		return imgs
+	}
+
+	for _, v := range c {
+		if len(v) < 2 {
+			continue
+		}
+
+		imgURL := string(v[1])
+		if strings.Contains(imgURL, "jiaoliuqu.com") || strings.Contains(imgURL, "xiaoy.name") {
+			imgURL = strings.Replace(imgURL, "https://zpic.xiaoy.name/", "", 1)
+			imgURL = strings.Replace(imgURL, "https://zpic.jiaoliuqu.com/", "", 1)
+			imgs = append(imgs, imgURL)
+		}
+	}
+
+	return imgs
 }

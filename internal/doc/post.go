@@ -170,6 +170,12 @@ func (p *PostManger) Push() {
 			continue
 		}
 
+		// pics参数
+		pics := p.readImgPath(repoObjPath + v.Md5)
+		if len(pics) > 3 {
+			pics = pics[0:3]
+		}
+
 		content := string(b)
 		form := url.Values{
 			"filename":   {v.FileName},
@@ -179,6 +185,7 @@ func (p *PostManger) Push() {
 			"title":      {title},
 			"category":   {category},
 			"updateTime": {v.UpdateTime},
+			"pics":       {strings.Join(pics, ",")},
 		}
 		var tagStr string
 		for _, v := range tag {
@@ -711,7 +718,7 @@ func inIgnoreList(file string) bool {
 }
 
 func isSupportImg(ext string) bool {
-	ImgExtList := []string{".jpeg", ".gif", ".png", ".jpg"}
+	ImgExtList := []string{".jpeg", ".gif", ".png", ".jpg", ".webp"}
 	for _, v := range ImgExtList {
 		if v == ext {
 			return true
@@ -764,7 +771,7 @@ func getMDTileCategory(filePath string) (string, string, []string, error) {
 	}
 	tag, err := getField(string(line), "tag:")
 	if err != nil {
-		return "", "", []string{}, nil
+		return title, category, []string{}, nil
 	}
 	tagArr := TrimStringArr(strings.Split(tag, " "))
 	return title, category, tagArr, nil
@@ -780,7 +787,7 @@ func getField(str string, field string) (string, error) {
 	return strings.TrimSpace(str[len(field):]), nil
 }
 
-func TrimStringArr(arr []string) []string{
+func TrimStringArr(arr []string) []string {
 	var newArr []string
 	for _, v := range arr {
 		if v != "" {
