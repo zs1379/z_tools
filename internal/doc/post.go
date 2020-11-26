@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -169,6 +170,12 @@ func (p *PostManger) Push() {
 			continue
 		}
 
+		// pics参数
+		pics := p.readImgPath(repoObjPath + v.Md5)
+		if len(pics) > 3 {
+			pics = pics[0:3]
+		}
+
 		content := string(b)
 		form := url.Values{
 			"filename":   {v.FileName},
@@ -178,11 +185,13 @@ func (p *PostManger) Push() {
 			"title":      {title},
 			"category":   {category},
 			"updateTime": {v.UpdateTime},
-			"tagNames":   tag,
+			"pics":       {strings.Join(pics, ",")},
 		}
-
-		url := fmt.Sprintf("%s/info/client?token=%s&action=add", p.ServerHost, p.UserToken)
-
+		var tagStr string
+		for _, v := range tag {
+			tagStr += fmt.Sprintf("&tagNames=%s", v)
+		}
+		url := fmt.Sprintf("%s/info/client?token=%s&action=add"+tagStr, p.ServerHost, p.UserToken)
 		_, err = pkg.ClientCall(url, form)
 		if err != nil {
 			log.Printf("文章推到远程异常:%s,文章:%s", err.Error(), v.FileName)
@@ -300,7 +309,12 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	for k, v := range l {
 		str += fmt.Sprintf("%d:%s ", k+1, v)
 	}
-	fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, str)
+
+	if runtime.GOOS == "windows" {
+		fmt.Printf("    %s\n", str)
+	} else {
+		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, str)
+	}
 	fmt.Println()
 	fmt.Print("    请输入分类编号:")
 
@@ -330,6 +344,29 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	}
 	fmt.Println()
 
+	fmt.Println(fmt.Sprintf("    设置你文章的tag,常用tag如下:"))
+
+	tagList, _ := p.getTagList()
+	var tagStr string
+	for _, v := range tagList {
+		tagStr += fmt.Sprintf("%s ", v)
+	}
+
+	if runtime.GOOS == "windows" {
+		fmt.Printf("    %s\n", tagStr)
+	} else {
+		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, tagStr)
+	}
+	fmt.Println()
+	fmt.Print("    请输入tag,多个空格隔开:")
+
+	tagInput := bufio.NewScanner(os.Stdin)
+
+	var tagArr []string
+	tagInput.Scan()
+	tagArr = strings.Split(strings.TrimSpace(tagInput.Text()), " ")
+	fmt.Println()
+
 	i := strings.Index(fileName, ".")
 	if i > 0 {
 		fileName = fileName[:i]
@@ -351,19 +388,19 @@ func (p *PostManger) NewDoc(fileName string, title string) {
 	docFormat := `---
 title: %s
 category: %s
-tag: 
+tag: %s
 ---`
 
 	if title == "" {
 		title = fileName[0 : len(fileName)-3]
 	}
-	docContent := fmt.Sprintf(docFormat, title, category)
+	docContent := fmt.Sprintf(docFormat, title, category, strings.Join(tagArr, " "))
 	err = ioutil.WriteFile(workPostsPath+fileName, []byte(docContent), 0644)
 	if err != nil {
 		log.Printf("本地创建文章异常:%s,文章:%s", err.Error(), fileName)
 		return
 	}
-	log.Printf("文件创建成功,文件名:%s, 分类:%s", fileName, category)
+	log.Printf("文件创建成功,文件名:%s, 分类:%s, tag:%s", fileName, category, strings.Join(tagArr, " "))
 	return
 }
 
@@ -469,16 +506,28 @@ func (p *PostManger) doAdd(fileName string) {
 		docFormat := `---
 title: 这是标题
 category: 文章分类
-tag: tag1 tag2
+tag: tag1
 ---`
-		log.Printf("获取文件title和分类异常,err:%s,文件名:%s", err.Error(), fileName)
+		log.Printf("获取文件格式异常,err:%s,文件名:%s", err.Error(), fileName)
 		fmt.Println()
 		fmt.Println("文档标准格式如下:")
 		fmt.Println(docFormat)
 		l, _ := p.getCategory()
 		fmt.Println()
 		fmt.Println(fmt.Sprintf("目前支持的分类如下:"))
-		fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(l, " "))
+		if runtime.GOOS == "windows" {
+			fmt.Printf("%s\n", strings.Join(l, " "))
+		} else {
+			fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(l, " "))
+		}
+		fmt.Println()
+		tagList, _ := p.getTagList()
+		fmt.Println(fmt.Sprintf("目前支持的tag如下,多个空格隔开:"))
+		if runtime.GOOS == "windows" {
+			fmt.Printf("%s\n", strings.Join(tagList, " "))
+		} else {
+			fmt.Printf("\x1b[%dm%s \x1b[0m\n", 36, strings.Join(tagList, " "))
+		}
 		fmt.Println()
 		return
 	}
@@ -624,6 +673,19 @@ func (p *PostManger) getCategory() ([]string, error) {
 	return l, nil
 }
 
+// getTagList 获取常用的tag
+func (p *PostManger) getTagList() ([]string, error) {
+	l := []string{
+		"java", "php", "go", "node.js", "oc", "spring", "后端",
+		"小程序", "ios", "android", "kotlin", "flutter", "xcode",
+		"js", "vue", "html", "css", "typescript", "html5",
+		"mysql", "redis", "sql", "json", "数据库", "nosql",
+		"linux", "nginx", "docker", "k8s",
+	}
+
+	return l, nil
+}
+
 // checkFilePath 检测文件路径是否非法,暂时只支持同级目录
 func checkFilePath(path string) error {
 	if strings.Contains(path, " ") {
@@ -656,7 +718,7 @@ func inIgnoreList(file string) bool {
 }
 
 func isSupportImg(ext string) bool {
-	ImgExtList := []string{".jpeg", ".gif", ".png", ".jpg"}
+	ImgExtList := []string{".jpeg", ".gif", ".png", ".jpg", ".webp"}
 	for _, v := range ImgExtList {
 		if v == ext {
 			return true
@@ -709,10 +771,9 @@ func getMDTileCategory(filePath string) (string, string, []string, error) {
 	}
 	tag, err := getField(string(line), "tag:")
 	if err != nil {
-		return "", "", []string{}, err
+		return title, category, []string{}, nil
 	}
-	tagArr := strings.Split(tag, " ")
-
+	tagArr := TrimStringArr(strings.Split(tag, " "))
 	return title, category, tagArr, nil
 }
 
@@ -724,4 +785,14 @@ func getField(str string, field string) (string, error) {
 		return "", fmt.Errorf("格式错误,文档需%s开头", field)
 	}
 	return strings.TrimSpace(str[len(field):]), nil
+}
+
+func TrimStringArr(arr []string) []string {
+	var newArr []string
+	for _, v := range arr {
+		if v != "" {
+			newArr = append(newArr, v)
+		}
+	}
+	return newArr
 }

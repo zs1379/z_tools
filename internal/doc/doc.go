@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	Version = "0.4.0"
+	Version = "0.4.7"
 )
 
 var (
@@ -71,7 +71,7 @@ func (d *Doc) Init() error {
 	if env == "test" {
 		d.ServerHost = "http://10.10.80.222:8000/2016-08-15/proxy"
 	} else {
-		d.ServerHost = "http://z.jiaoliuqu.com"
+		d.ServerHost = "http://z1.xiaoy.name"
 	}
 
 	d.UserToken = d.ReadToken()
@@ -86,7 +86,7 @@ func (d *Doc) Init() error {
 // ReadToken 读取用户token
 func (d *Doc) ReadToken() string {
 	b, _ := ioutil.ReadFile(tokenPath)
-	return string(b)
+	return strings.TrimSpace(string(b))
 }
 
 // ReadEnv 读取环境变量
@@ -203,7 +203,11 @@ func (d *Doc) Update(auto bool) {
 	// 自动检测的给用户选择
 	if auto {
 		fmt.Println()
-		fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, "检测到有新版本,按n取消,按其余任意键升级~")
+		if runtime.GOOS == "windows" {
+			fmt.Printf("    %s\n", "检测到有新版本,按n取消,按其余任意键升级~")
+		} else {
+			fmt.Printf("    \x1b[%dm%s \x1b[0m\n", 36, "检测到有新版本,按n取消,按其余任意键升级~")
+		}
 		fmt.Printf("    请输入:")
 		input := bufio.NewScanner(os.Stdin)
 		input.Scan()
@@ -225,7 +229,7 @@ func (d *Doc) Update(auto bool) {
 		newFile += ".exe"
 	}
 
-	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", newFile), newFile)
+	err = pkg.DownLoadFile(fmt.Sprintf("https://zpic.xiaoy.name/%s", newFile), newFile)
 	if err != nil {
 		log.Printf("获取新版本文件异常:%s", err.Error())
 		return
@@ -330,6 +334,7 @@ func (d *Doc) replaceImg(filePath string) error {
 		return errors.New("拉取七牛文件上传凭证异常:" + err.Error())
 	}
 
+	change := false
 	for _, v := range c {
 		if len(v) < 2 {
 			continue
@@ -342,29 +347,61 @@ func (d *Doc) replaceImg(filePath string) error {
 			continue
 		}
 
-		if strings.Contains(imgURL, "jiaoliuqu.com") {
+		if strings.Contains(imgURL, "jiaoliuqu.com") || strings.Contains(imgURL, "xiaoy.name") {
 			continue
 		}
 
-		if !strings.HasPrefix(imgURL, "../img/") && strings.HasPrefix(imgURL, `..\img\`) {
-			log.Printf("该图片路径非法%s,正确格式为../img/xx", imgURL)
-			continue
-		}
-
-		ret, err := qiniu.UploadFile(imgURL[1:], pkg.GetKey()+ext, imgToken)
+		ret, err := qiniu.UploadFile(imgURL, pkg.GetKey()+ext, imgToken)
 		if err != nil {
 			log.Printf("上传图片异常:%s,imgURL:%s", err.Error(), imgURL)
 			continue
 		}
 
-		newImg := fmt.Sprintf("https://zpic.jiaoliuqu.com/%s", ret.Key)
+		change = true
+		newImg := fmt.Sprintf("https://zpic.xiaoy.name/%s", ret.Key)
 		content = strings.Replace(content, imgURL, newImg, -1)
 		log.Printf("图片替换成功,原始图片:%s,新图片:%s", imgURL, newImg)
 	}
 
-	err = ioutil.WriteFile(filePath, []byte(content), 0644)
-	if err != nil {
-		return errors.New("写入文章异常:" + err.Error())
+	if change {
+		err = ioutil.WriteFile(filePath, []byte(content), 0644)
+		if err != nil {
+			return errors.New("写入文章异常:" + err.Error())
+		}
 	}
 	return nil
+}
+
+// readImgPath 读取文件里面的图片地址
+func (d *Doc) readImgPath(filePath string) []string {
+	var imgs []string
+	b, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return imgs
+	}
+	if len(b) == 0 {
+		return imgs
+	}
+
+	content := string(b)
+	re, _ := regexp.Compile(`\!\[.*?\]\((.*?)\)`)
+	c := re.FindAllSubmatch([]byte(content), -1)
+	if len(c) == 0 {
+		return imgs
+	}
+
+	for _, v := range c {
+		if len(v) < 2 {
+			continue
+		}
+
+		imgURL := string(v[1])
+		if strings.Contains(imgURL, "jiaoliuqu.com") || strings.Contains(imgURL, "xiaoy.name") {
+			imgURL = strings.Replace(imgURL, "https://zpic.xiaoy.name/", "", 1)
+			imgURL = strings.Replace(imgURL, "https://zpic.jiaoliuqu.com/", "", 1)
+			imgs = append(imgs, imgURL)
+		}
+	}
+
+	return imgs
 }

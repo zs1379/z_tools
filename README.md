@@ -2,7 +2,7 @@
 用于协助快速上传文章至z项目
 
 #### 1.安装doc 
-1) sh -c "$(curl -fsSL https://zpic.jiaoliuqu.com/install.sh)"
+1) sh -c "$(curl -fsSL https://zpic.xiaoy.name/install.sh)"
 2) cd ~/docWorkSpace
 
 #### 2.初始化 
